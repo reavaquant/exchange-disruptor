@@ -1,0 +1,5 @@
+add_executable(exchange_disruptor_tests test_main.cpp)
+target_link_libraries(exchange_disruptor_tests PRIVATE exchange_disruptor_options)
+target_set_warnings(exchange_disruptor_tests)
+
+add_test(NAME exchange_disruptor.tests COMMAND exchange_disruptor_tests)

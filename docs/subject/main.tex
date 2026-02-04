@@ -1,0 +1,360 @@
+
+\documentclass[11pt,a4paper]{article}
+
+% -------------------- Packages (style proche de ton sujet M1) --------------------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{geometry}
+\geometry{margin=2.3cm}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\setlist[itemize]{itemsep=2pt,topsep=3pt}
+\setlist[enumerate]{itemsep=2pt,topsep=3pt}
+
+% Petit helper "Part I"
+\newcommand{\Part}[2]{%
+  \vspace{1.0em}
+  \noindent{\large\textbf{Part #1}}\\
+  \textbf{#2}\\
+  \vspace{0.5em}
+}
+
+\begin{document}
+
+% ============================== COVER ==============================
+\begin{center}
+{\Large \textbf{C++ (Quant Dev) -- The Project}}\\
+\vspace{0.2em}
+{\large \textbf{Mini Exchange Simulator + Disruptor-Lite}}\\
+\vspace{0.6em}
+\textbf{Année :} 2026 \hfill \textbf{Nom :} \underline{\hspace{7cm}}\\
+\vspace{0.2em}
+\end{center}
+
+% =========================== GENERAL RULES =========================
+\section*{0. Règles générales}
+\begin{enumerate}
+  \item Le livrable est un \textbf{repo GitHub} contenant uniquement du code source (\texttt{.h/.cpp}) et la config de build (\texttt{CMakeLists.txt}).
+  \item Le projet doit compiler en \textbf{C++20} (C++17 toléré si vous expliquez pourquoi dans le README).
+  \item Build \textbf{CMake} obligatoire. Aucune dépendance payante.
+  \item Dépendances autorisées (0€) : Boost.Asio (réseau), Catch2 (tests), nlohmann/json (JSON), fmt/spdlog (logs).
+  \item \textbf{Interdit :} ajouter des \textbf{membres publics} “gratuits” dans les classes demandées. Attributs \textbf{privés} + getters si besoin.
+  \item \textbf{Concurrence :} l'\textbf{OrderBook} ne doit être modifié \textbf{que} par le thread \textbf{MatchingEngine}.
+  \item Deux diagrammes sont requis dans le rendu (README ou PDF) :
+    \begin{itemize}
+      \item diagramme d’architecture (composants + flèches),
+      \item diagramme de séquence (un scénario d’exécution).
+    \end{itemize}
+\end{enumerate}
+
+% ========================== CONTEXTE (MIX) =========================
+\section*{1. Contexte (idée générale)}
+On veut simuler une mini-bourse en \textbf{limit order book} :
+\begin{itemize}
+  \item Les clients envoient des ordres (\textbf{Limit}, \textbf{Market}, \textbf{Cancel}).
+  \item Le serveur maintient un carnet : côté \textbf{bid} (achats) et côté \textbf{ask} (ventes).
+  \item Le \textbf{matching} suit \textbf{price--time priority} :
+    \begin{itemize}
+      \item meilleur prix d’abord (\textit{best bid} le plus haut, \textit{best ask} le plus bas),
+      \item à prix égal, \textbf{FIFO} (ordre d’arrivée).
+    \end{itemize}
+  \item Le serveur renvoie des événements : \textbf{Ack}, \textbf{Reject}, \textbf{Fill}.
+\end{itemize}
+
+Le projet comporte aussi un bus interne \textbf{Disruptor-Lite} : un \textbf{ring buffer SPSC} pour transférer les messages entre threads.
+SPSC = \textbf{S}ingle \textbf{P}roducer \textbf{S}ingle \textbf{C}onsumer (un producteur, un consommateur).
+
+\bigskip
+\noindent\textbf{Architecture cible (à mettre dans votre diagramme)} :
+\[
+\text{Client} \leftrightarrow \text{TCP} \rightarrow \text{Decode} \rightarrow \text{IN Bus} \rightarrow
+\text{Matching} \rightarrow \text{OUT Bus} \rightarrow \text{Encode} \rightarrow \text{TCP} \leftrightarrow \text{Client}.
+\]
+
+% ================================ PART I ================================
+\Part{I}{Order Book \& Matching Engine (single-thread)}
+
+\subsection*{1. Spécification}
+On définit :
+\begin{itemize}
+  \item \textbf{Side} : BUY ou SELL.
+  \item \textbf{Symbol} : chaîne (ex : \texttt{"BTC"}, \texttt{"AAPL"}).
+  \item \textbf{Price} et \textbf{Qty} : strictement positifs pour les ordres concernés.
+\end{itemize}
+
+\noindent Types de commandes (entrée) :
+\begin{itemize}
+  \item \textbf{Limit} : (clientId, orderId, symbol, side, price, qty)
+  \item \textbf{Market} : (clientId, orderId, symbol, side, qty)
+  \item \textbf{Cancel} : (clientId, orderId, symbol)
+\end{itemize}
+
+\noindent Types d’événements (sortie) :
+\begin{itemize}
+  \item \textbf{Ack} : commande acceptée
+  \item \textbf{Reject} : commande refusée + raison
+  \item \textbf{Fill} : exécution (matchId, price, qty) (partielle ou totale)
+\end{itemize}
+
+\subsection*{2. Implementation (classes imposées)}
+\begin{enumerate}
+  \item Implémenter \textbf{enum class Side} avec deux valeurs : \texttt{Buy}, \texttt{Sell}.
+  \item Implémenter \textbf{enum class CommandType} : \texttt{Limit}, \texttt{Market}, \texttt{Cancel}.
+  \item Implémenter \textbf{enum class EventType} : \texttt{Ack}, \texttt{Reject}, \texttt{Fill}.
+  \item Implémenter \textbf{enum class RejectReason} contenant au minimum :
+    \texttt{INVALID\_QTY}, \texttt{INVALID\_PRICE}, \texttt{UNKNOWN\_SYMBOL}, \texttt{UNKNOWN\_ORDER\_ID},
+    \texttt{NOT\_OWNER}, \texttt{INTERNAL\_ERROR}.
+
+  \item Implémenter la classe abstraite \textbf{Command} :
+  \begin{itemize}
+    \item membres privés : \texttt{\_clientId}, \texttt{\_orderId}, \texttt{\_symbol}
+    \item getters : \texttt{getClientId()}, \texttt{getOrderId()}, \texttt{getSymbol()}
+    \item constructeur initialisant ces champs
+    \item destructeur virtuel
+    \item méthode pure virtuelle : \texttt{CommandType getType() const}
+  \end{itemize}
+
+  \item Dériver \textbf{Command} en trois classes :
+  \begin{itemize}
+    \item \textbf{LimitCommand} :
+      \begin{itemize}
+        \item membres privés : \texttt{\_side}, \texttt{\_price}, \texttt{\_qty}
+        \item getters : \texttt{getSide()}, \texttt{getPrice()}, \texttt{getQty()}
+        \item le constructeur doit vérifier : \texttt{price > 0} et \texttt{qty > 0} sinon erreur (à votre choix : exception ou Reject en amont)
+      \end{itemize}
+    \item \textbf{MarketCommand} :
+      \begin{itemize}
+        \item membres privés : \texttt{\_side}, \texttt{\_qty}
+        \item le constructeur doit vérifier : \texttt{qty > 0}
+      \end{itemize}
+    \item \textbf{CancelCommand} :
+      \begin{itemize}
+        \item aucun membre supplémentaire obligatoire
+      \end{itemize}
+  \end{itemize}
+
+  \item Implémenter la classe abstraite \textbf{Event} :
+  \begin{itemize}
+    \item membres privés : \texttt{\_clientId}, \texttt{\_orderId}
+    \item getters : \texttt{getClientId()}, \texttt{getOrderId()}
+    \item constructeur initialisant ces champs
+    \item destructeur virtuel
+    \item méthode pure virtuelle : \texttt{EventType getType() const}
+  \end{itemize}
+
+  \item Dériver \textbf{Event} en trois classes :
+  \begin{itemize}
+    \item \textbf{AckEvent} : pas d’attribut supplémentaire obligatoire
+    \item \textbf{RejectEvent} :
+      \begin{itemize}
+        \item membre privé : \texttt{\_reason} (type \texttt{RejectReason})
+        \item getter : \texttt{getReason()}
+      \end{itemize}
+    \item \textbf{FillEvent} :
+      \begin{itemize}
+        \item membres privés : \texttt{\_matchId}, \texttt{\_price}, \texttt{\_qty}
+        \item getters correspondants
+      \end{itemize}
+  \end{itemize}
+
+  \item Implémenter une classe \textbf{Order} (objet stocké dans le book) :
+  \begin{itemize}
+    \item membres privés minimum : \texttt{\_clientId}, \texttt{\_orderId}, \texttt{\_side}, \texttt{\_price}, \texttt{\_qtyRemaining}
+    \item getters + une méthode pour décrémenter la quantité restante lors d’un fill
+  \end{itemize}
+
+  \item Implémenter la classe \textbf{OrderBook} :
+  \begin{itemize}
+    \item contient deux côtés : bids et asks
+    \item doit permettre :
+      \begin{itemize}
+        \item insérer un \textbf{Order} (limit) au bon niveau de prix
+        \item accéder au meilleur bid / meilleur ask
+        \item retirer les ordres totalement exécutés
+        \item gérer \textbf{Cancel(orderId)} (avec contrôle du \texttt{clientId})
+      \end{itemize}
+    \item \textbf{Exigence :} FIFO à prix égal (vous devez donc stocker les ordres à un prix donné dans une structure FIFO).
+    \item \textbf{Exigence :} \textbf{Cancel} ne doit pas être implémenté en “parcourant tout le book” (il faut un index interne par \texttt{orderId}).
+  \end{itemize}
+
+  \item Implémenter la classe \textbf{MatchingEngine} :
+  \begin{itemize}
+    \item membres privés : \texttt{\_book} (OrderBook), \texttt{\_nextMatchId}
+    \item méthode publique : \texttt{process(const Command\&)} qui renvoie une collection d’\texttt{Event}
+    \item règles :
+      \begin{itemize}
+        \item \textbf{Limit} : si crossing, exécuter immédiatement contre le côté opposé puis (si reste) insérer le reste dans le book
+        \item \textbf{Market} : exécuter tant qu’il y a de la liquidité, puis s’arrêter (le reste est abandonné)
+        \item \textbf{Cancel} : si inconnu $\Rightarrow$ Reject ; si \texttt{clientId} ne correspond pas $\Rightarrow$ Reject (NOT\_OWNER)
+      \end{itemize}
+  \end{itemize}
+\end{enumerate}
+
+\subsection*{3. Tests unitaires (obligatoires)}
+Écrire au minimum 8 tests couvrant :
+\begin{enumerate}
+  \item insertion d’une limit sans crossing $\Rightarrow$ book mis à jour
+  \item limit crossing $\Rightarrow$ fill total
+  \item limit crossing $\Rightarrow$ fill partiel + reste au book
+  \item market qui balaye plusieurs niveaux
+  \item FIFO à prix égal (ordre A avant ordre B)
+  \item cancel d’un ordre existant
+  \item cancel d’un ordre déjà rempli $\Rightarrow$ reject
+  \item cancel d’un orderId inconnu $\Rightarrow$ reject
+\end{enumerate}
+
+\subsection*{4. Points difficiles (à lire avant de coder)}
+\begin{itemize}
+  \item \textbf{FIFO} : si votre structure de niveau de prix n’est pas une file, vous casserez la priorité temps.
+  \item \textbf{Cancel} : sans index par \texttt{orderId}, vous aurez une implémentation lente et fragile.
+\end{itemize}
+
+% ================================ PART II ================================
+\Part{II}{Protocole + TCP Server/Client}
+
+\subsection*{1. Contexte (mix)}
+TCP est un flux d’octets : un \texttt{read()} ne correspond pas à ``un message''.
+On impose donc un \textbf{framing length-prefix} : d’abord la taille, puis le payload.
+
+\subsection*{2. Spécification du framing (obligatoire)}
+\begin{itemize}
+  \item Message = \texttt{uint32\_t len} (network byte order) suivi de \texttt{len} octets (payload).
+  \item Le payload doit représenter une \textbf{Command} (client$\to$serveur) ou un \textbf{Event} (serveur$\to$client).
+\end{itemize}
+
+\subsection*{3. Implementation (classes imposées)}
+\begin{enumerate}
+  \item Implémenter une classe \textbf{Framer} :
+  \begin{itemize}
+    \item méthode \texttt{frame(payloadBytes) -> framedBytes}
+    \item méthode \texttt{consume(buffer) -> (0 ou plusieurs messages complets)}
+    \item \textbf{Exigence :} \texttt{consume} doit gérer les lectures partielles (payload incomplet) et conserver l’état interne.
+  \end{itemize}
+
+  \item Implémenter une classe \textbf{MessageCodec} :
+  \begin{itemize}
+    \item \texttt{encodeCommand(const Command\&) -> payloadBytes}
+    \item \texttt{decodeCommand(payloadBytes) -> Command}
+    \item \texttt{encodeEvent(const Event\&) -> payloadBytes}
+    \item \texttt{decodeEvent(payloadBytes) -> Event} (si nécessaire côté client)
+    \item Le format est libre (JSON autorisé) mais doit supporter tous les champs requis en Part I.
+  \end{itemize}
+
+  \item Implémenter une classe \textbf{ExchangeServer} :
+  \begin{itemize}
+    \item accepte plusieurs clients TCP
+    \item pour chaque client : lit, reconstitue les messages via \textbf{Framer}, décode via \textbf{MessageCodec}
+    \item envoie la commande vers le pipeline interne (Part III)
+    \item renvoie les événements au client concerné
+  \end{itemize}
+
+  \item Implémenter une classe \textbf{ExchangeClient} (CLI) :
+  \begin{itemize}
+    \item se connecte au serveur
+    \item lit des commandes texte (stdin) et envoie les commandes au serveur
+    \item affiche les événements reçus
+  \end{itemize}
+\end{enumerate}
+
+\subsection*{4. Point difficile}
+\begin{itemize}
+  \item Reconstituer proprement les messages : buffer + len + payload, sans perdre de données.
+  \item Gérer les déconnexions sans crash (serveur robuste).
+\end{itemize}
+
+% ================================ PART III ================================
+\Part{III}{Disruptor-Lite (Ring Buffer SPSC) + Pipeline multi-thread}
+
+\subsection*{1. Contexte (mix)}
+Un ring buffer SPSC est un tableau circulaire partagé entre :
+\begin{itemize}
+  \item un producteur (qui écrit à l’index \textit{tail}),
+  \item un consommateur (qui lit à l’index \textit{head}).
+\end{itemize}
+Le producteur ne doit jamais écraser un slot non consommé (buffer plein).
+Le consommateur ne doit jamais lire un slot non écrit (buffer vide).
+
+\subsection*{2. Implementation (classe imposée)}
+\begin{enumerate}
+  \item Implémenter une classe template \textbf{RingBuffer<T>} :
+  \begin{itemize}
+    \item membres privés :
+      \begin{itemize}
+        \item un buffer pré-alloué de capacité fixe
+        \item deux compteurs atomiques \texttt{\_head} et \texttt{\_tail} (avec padding/alignement pour éviter le false sharing)
+        \item la capacité (puissance de 2 recommandée)
+      \end{itemize}
+    \item méthodes publiques :
+      \begin{itemize}
+        \item \texttt{bool tryPush(const T\&)}
+        \item \texttt{bool tryPop(T\&)}
+        \item \texttt{size\_t capacity() const}
+      \end{itemize}
+    \item \textbf{Exigence :} aucune allocation mémoire dans \texttt{tryPush/tryPop}.
+    \item \textbf{Exigence :} utiliser \texttt{std::atomic} et une discipline de visibilité mémoire correcte (acquire/release).
+  \end{itemize}
+
+  \item Créer deux instances :
+  \begin{itemize}
+    \item \textbf{IN\_BUS} : transporte les \textbf{Command} du thread réseau vers le thread matching,
+    \item \textbf{OUT\_BUS} : transporte les \textbf{Event} du thread matching vers le thread réseau.
+  \end{itemize}
+
+  \item Pipeline multi-thread (obligatoire) :
+  \begin{itemize}
+    \item Thread réseau : reçoit \textbf{Command} $\rightarrow$ push dans \textbf{IN\_BUS}
+    \item Thread matching : pop \textbf{IN\_BUS} $\rightarrow$ \textbf{MatchingEngine} $\rightarrow$ push \textbf{OUT\_BUS}
+    \item Thread réseau : pop \textbf{OUT\_BUS} $\rightarrow$ renvoie au client
+  \end{itemize}
+
+  \item Politique buffer plein (à fixer et documenter) :
+  \begin{itemize}
+    \item Si \textbf{IN\_BUS} est plein, vous devez choisir une politique unique (ex: rejet immédiat, ou attente active).
+    \item Cette politique doit être écrite dans le README et testée au moins une fois.
+  \end{itemize}
+\end{enumerate}
+
+\subsection*{3. Points difficiles (à lire avant de coder)}
+\begin{itemize}
+  \item Si votre ordering atomique est faux, vous aurez des bugs \textbf{rares} et difficiles à reproduire.
+  \item Si votre padding est absent, vous pouvez observer des performances instables (false sharing).
+\end{itemize}
+
+% ================================ PART IV ================================
+\Part{IV}{Rendu, diagrammes, démo}
+
+\subsection*{1. Diagrammes (obligatoires)}
+\begin{enumerate}
+  \item \textbf{Architecture} : client, TCP, framer, codec, IN\_BUS, matching, book, OUT\_BUS.
+  \item \textbf{Séquence} : scénario minimal :
+    \begin{itemize}
+      \item client pose une limit SELL,
+      \item client pose une limit BUY crossing,
+      \item serveur renvoie Ack + Fill(s),
+      \item book mis à jour.
+    \end{itemize}
+\end{enumerate}
+
+\subsection*{2. Démo minimale (obligatoire dans le README)}
+Le README doit contenir un scénario reproductible :
+\begin{itemize}
+  \item commande pour compiler
+  \item commande pour lancer le serveur
+  \item commandes pour lancer 1 ou 2 clients
+  \item séquence d’ordres + résultat attendu (ACK/FILL/REJECT)
+\end{itemize}
+
+\subsection*{3. Tests d’intégration (obligatoire)}
+Au moins un test (ou script) qui :
+\begin{itemize}
+  \item lance le serveur,
+  \item envoie une séquence d’ordres,
+  \item vérifie la présence et l’ordre des événements attendus.
+\end{itemize}
+
+\end{document}

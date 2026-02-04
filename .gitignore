@@ -1,0 +1,95 @@
+# ------------------------------
+# CMake / Build artifacts
+# ------------------------------
+build/
+build-*/
+cmake-build-*/
+out/
+dist/
+
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+Testing/
+DartConfiguration.tcl
+
+# Ninja / Make generated files
+/.ninja_deps
+/.ninja_log
+/build.ninja
+/Makefile
+
+# ------------------------------
+# C/C++ binaries and objects
+# ------------------------------
+*.o
+*.obj
+*.lo
+*.la
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+
+# Debug / profiling symbols
+*.dSYM/
+*.pdb
+*.idb
+*.profraw
+*.profdata
+
+# Coverage
+*.gcda
+*.gcno
+*.gcov
+coverage/
+lcov.info
+
+# ------------------------------
+# Logs / temp files
+# ------------------------------
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# ------------------------------
+# IDE / Editor
+# ------------------------------
+.vscode/
+.idea/
+*.code-workspace
+
+# ------------------------------
+# OS files
+# ------------------------------
+.DS_Store
+Thumbs.db
+
+# ------------------------------
+# Python (if helper scripts appear)
+# ------------------------------
+__pycache__/
+*.pyc
+
+# ------------------------------
+# LaTeX generated files (docs/)
+# ------------------------------
+*.aux
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.out
+*.toc
+*.synctex.gz
