@@ -1,6 +1,13 @@
 #include "fill_event.h"
 
-FillEvent::FillEvent(uint64_t clientId, uint64_t orderId, uint64_t matchId, double price, double qty) : Event(clientId, orderId), _matchId(matchId), _price(price), _qty(qty) {}
+FillEvent::FillEvent(uint64_t clientId, uint64_t orderId, uint64_t matchId, double price, double qty) : Event(clientId, orderId), _matchId(matchId), _price(price), _qty(qty) {
+    if (price <= 0) {
+        throw std::invalid_argument("Price must be greater than 0");
+    }
+    if (qty <= 0) {
+        throw std::invalid_argument("Quantity must be greater than 0");
+    }
+}
 
 EventType FillEvent::getType() const { return EventType::Fill; }
 
