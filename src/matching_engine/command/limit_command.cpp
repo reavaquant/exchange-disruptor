@@ -1,6 +1,6 @@
 #include "limit_command.h"
 
-LimitCommand::LimitCommand(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, double price, double qty) : Command(clientId, orderId, symbol), _price(price), _qty(qty), _side(side) {
+LimitCommand::LimitCommand(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, int64_t price, double qty) : Command(clientId, orderId, symbol), _price(price), _qty(qty), _side(side) {
     if (price <= 0) {
         throw std::invalid_argument("Price must be greater than 0");
     }
@@ -16,7 +16,7 @@ CommandType LimitCommand::getType() const {
     return CommandType::Limit;
 }
 
-double LimitCommand::getPrice() const {
+int64_t LimitCommand::getPrice() const {
     return _price;
 }
 
