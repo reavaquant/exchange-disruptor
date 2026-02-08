@@ -10,12 +10,16 @@ enum class BookSide { Bid, Ask };
 
 class Book {
 public:
-    Book(BookSide side) : _side(side) {}
-    void addOrder(const Order& order);
-    void removeExecutedOrder(uint64_t orderId);
-    void cancelOrder(uint64_t orderId);
-    std::list<Order> getTopLevels(int n) const; // Get top n levels of the book
+    Book(BookSide side);
 
+    bool addLimit(const Order& order);
+    bool cancelOrder(uint64_t orderId, uint64_t clientId);
+
+    bool empty() const;
+    Order* topOrder();
+    const Order* topOrder() const;
+
+    bool purgeTop();
 private:
     using Orders = std::list<Order>;
     using Levels = std::map<int64_t, Orders>;
