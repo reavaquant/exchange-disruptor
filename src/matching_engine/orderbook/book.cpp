@@ -1,5 +1,5 @@
-#include "book.h"
-#include "enum.h"
+#include "matching_engine/orderbook/book.h"
+#include "matching_engine/enum.h"
 #include <optional>
 
 Book::Book(BookSide side) : _side(side) {}
@@ -28,14 +28,14 @@ std::optional<RejectReason> Book::cancelOrder(uint64_t orderId, uint64_t clientI
     }
     Locator locator = it->second;
     if (locator.orderIt->getClientId() != clientId) {
-        return RejectReason::NotOwner; // 
+        return RejectReason::NotOwner; // Client ID does not match order owner
     }
     _orderIdMap.erase(it);
     locator.levelIt->second.erase(locator.orderIt);
     if (locator.levelIt->second.empty()) {
         _book.erase(locator.levelIt);
     }
-    return std::nullopt; // Cancellation successful
+    return std::nullopt;
 }
 
 bool Book::empty() const {

@@ -25,6 +25,7 @@ enum class RejectReason {
     UnknownSymbol,
     UnknownOrderId,
     DuplicateOrderId,
+    OrderNotFound,
     NotOwner,
     InternalError,
 };

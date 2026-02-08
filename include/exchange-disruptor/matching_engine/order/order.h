@@ -1,7 +1,7 @@
 #ifndef ORDER_H
 #define ORDER_H
 
-#include "enum.h"
+#include "matching_engine/enum.h"
 #include <string>
 
 class Order {
