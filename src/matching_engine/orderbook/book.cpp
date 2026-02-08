@@ -15,7 +15,7 @@ std::optional<RejectReason> Book::addLimit(const Order& order) {
         return RejectReason::InvalidSide; // Order side does not match book side
     }
     if (_orderIdMap.find(order.getOrderId()) != _orderIdMap.end()) { return RejectReason::DuplicateOrderId; } // Duplicate order ID
-    auto [levelIt, created] = _book.emplace(order.getPrice(), std::list<Order>{});
+    auto [levelIt, created] = _book.try_emplace(order.getPrice(), std::list<Order>{});
     levelIt->second.push_back(order);
     _orderIdMap[order.getOrderId()] = {levelIt, std::prev(levelIt->second.end())};
     return std::nullopt; 
