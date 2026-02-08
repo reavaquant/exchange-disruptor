@@ -20,12 +20,13 @@ public:
 
     std::optional<RejectReason> addLimit(const Order& order); 
     std::optional<RejectReason> cancelOrder(uint64_t orderId, uint64_t clientId);
-    bool purgeTop();
+    bool purgeBestBid();
+    bool purgeBestAsk();
 
 private:
+    std::string _symbol;
     Book _bidBook;
     Book _askBook;
-    std::string _symbol;
     std::unordered_map<uint64_t, BookSide> _orderIdToBookSide; // orderId -> book side for quick cancellation
 };
 

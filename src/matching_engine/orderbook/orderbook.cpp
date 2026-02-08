@@ -1,12 +1,15 @@
 #include "matching_engine/orderbook/orderbook.h"
 
-OrderBook::OrderBook(std::string symbol) : _bidBook(BookSide::Bid), _askBook(BookSide::Ask), _symbol(symbol) {}
+OrderBook::OrderBook(std::string symbol) : _symbol(symbol), _bidBook(BookSide::Bid), _askBook(BookSide::Ask) {}
 
 const Book& OrderBook::getBidBook() const & { return _bidBook; }
 const Book& OrderBook::getAskBook() const & { return _askBook; }
 const std::string& OrderBook::getSymbol() const & { return _symbol; }
 
 std::optional<RejectReason> OrderBook::addLimit(const Order& order) {
+    if(order.getSymbol() != _symbol) {
+        return RejectReason::UnknownSymbol; // Symbol mismatch
+    }
     if (order.getSide() == Side::Buy) {
         auto rejectReason = _bidBook.addLimit(order);
         if (!rejectReason) {
@@ -41,4 +44,30 @@ std::optional<RejectReason> OrderBook::cancelOrder(uint64_t orderId, uint64_t cl
         }
         return rejectReason;
     }
+}
+
+bool OrderBook::purgeBestBid() {
+    auto topBid = _bidBook.topOrder();
+    if (topBid == nullptr) {
+        return false;
+    }
+    uint64_t orderId = topBid->getOrderId();
+    bool purged = _bidBook.purgeTop();
+    if (purged) {
+        _orderIdToBookSide.erase(orderId);
+    }
+    return purged;
+}
+
+bool OrderBook::purgeBestAsk() {
+    auto topAsk = _askBook.topOrder();
+    if (topAsk == nullptr) {
+        return false;
+    }
+    uint64_t orderId = topAsk->getOrderId();
+    bool purged = _askBook.purgeTop();
+    if (purged) {
+        _orderIdToBookSide.erase(orderId);
+    }
+    return purged;
 }
