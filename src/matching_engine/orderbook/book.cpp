@@ -1,36 +1,41 @@
 #include "book.h"
+#include "enum.h"
+#include <optional>
 
 Book::Book(BookSide side) : _side(side) {}
 
-bool Book::addLimit(const Order& order) {
-    if (order.getPrice() <= 0 || order.getQtyRemaining() <= 0) {
-        return false; // Invalid price or quantity
+std::optional<RejectReason> Book::addLimit(const Order& order) {
+    if (order.getPrice() <= 0) {
+        return RejectReason::InvalidPrice; // Invalid price or quantity
+    }
+    if (order.getQtyRemaining() <= 0) {
+        return RejectReason::InvalidQuantity;
     }
     if ((order.getSide() == Side::Buy && _side != BookSide::Bid) || (order.getSide() == Side::Sell && _side != BookSide::Ask)) {
-        return false; // Order side does not match book side
+        return RejectReason::InvalidSide; // Order side does not match book side
     }
-    if (_orderIdMap.find(order.getOrderId()) != _orderIdMap.end()) { return false; } // Duplicate order ID
+    if (_orderIdMap.find(order.getOrderId()) != _orderIdMap.end()) { return RejectReason::DuplicateOrderId; } // Duplicate order ID
     auto [levelIt, created] = _book.emplace(order.getPrice(), std::list<Order>{});
     levelIt->second.push_back(order);
     _orderIdMap[order.getOrderId()] = {levelIt, std::prev(levelIt->second.end())};
-    return true;
+    return std::nullopt; 
 }
 
-bool Book::cancelOrder(uint64_t orderId, uint64_t clientId) { 
+std::optional<RejectReason> Book::cancelOrder(uint64_t orderId, uint64_t clientId) { 
     auto it = _orderIdMap.find(orderId);
     if (it == _orderIdMap.end()) {
-        return false; // Order ID not found
+        return RejectReason::OrderNotFound; // Order ID not found
     }
     Locator locator = it->second;
     if (locator.orderIt->getClientId() != clientId) {
-        return false; // 
+        return RejectReason::NotOwner; // 
     }
     _orderIdMap.erase(it);
     locator.levelIt->second.erase(locator.orderIt);
     if (locator.levelIt->second.empty()) {
         _book.erase(locator.levelIt);
     }
-    return true;
+    return std::nullopt; // Cancellation successful
 }
 
 bool Book::empty() const {

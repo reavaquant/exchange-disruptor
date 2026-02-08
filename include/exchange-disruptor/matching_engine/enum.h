@@ -21,8 +21,10 @@ enum class EventType {
 enum class RejectReason {
     InvalidQuantity,
     InvalidPrice,
+    InvalidSide,
     UnknownSymbol,
     UnknownOrderId,
+    DuplicateOrderId,
     NotOwner,
     InternalError,
 };

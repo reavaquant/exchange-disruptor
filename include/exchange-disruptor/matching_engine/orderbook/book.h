@@ -2,8 +2,10 @@
 #define BOOK_H
 
 #include "order.h"
+#include "enum.h"
 #include <map>
 #include <list>
+#include <optional>
 
 enum class BookSide { Bid, Ask };
 
@@ -11,8 +13,8 @@ class Book {
 public:
     Book(BookSide side);
 
-    bool addLimit(const Order& order);
-    bool cancelOrder(uint64_t orderId, uint64_t clientId);
+    std::optional<RejectReason> addLimit(const Order& order);
+    std::optional<RejectReason> cancelOrder(uint64_t orderId, uint64_t clientId);
 
     bool empty() const;
     Order* topOrder();
