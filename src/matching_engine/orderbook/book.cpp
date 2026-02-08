@@ -24,7 +24,7 @@ std::optional<RejectReason> Book::addLimit(const Order& order) {
 std::optional<RejectReason> Book::cancelOrder(uint64_t orderId, uint64_t clientId) { 
     auto it = _orderIdMap.find(orderId);
     if (it == _orderIdMap.end()) {
-        return RejectReason::OrderNotFound; // Order ID not found
+        return RejectReason::UnknownOrderId; // Order ID not found
     }
     Locator locator = it->second;
     if (locator.orderIt->getClientId() != clientId) {

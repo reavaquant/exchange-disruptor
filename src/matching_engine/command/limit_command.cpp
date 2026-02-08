@@ -12,18 +12,19 @@ LimitCommand::LimitCommand(uint64_t clientId, uint64_t orderId, std::string symb
     }
 }
 
-CommandType LimitCommand::getType() const {
-    return CommandType::Limit;
+const CommandType& LimitCommand::getType() const {
+    static const CommandType kType = CommandType::Limit;
+    return kType;
 }
 
-int64_t LimitCommand::getPrice() const {
+const int64_t& LimitCommand::getPrice() const {
     return _price;
 }
 
-double LimitCommand::getQty() const {
+const double& LimitCommand::getQty() const {
     return _qty;
 }
 
-Side LimitCommand::getSide() const {
+const Side& LimitCommand::getSide() const {
     return _side;
 }

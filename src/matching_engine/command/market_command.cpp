@@ -9,14 +9,15 @@ MarketCommand::MarketCommand(uint64_t clientId, uint64_t orderId, std::string sy
     }
 }
 
-CommandType MarketCommand::getType() const {
-    return CommandType::Market;
+const CommandType& MarketCommand::getType() const {
+    static const CommandType kType = CommandType::Market;
+    return kType;
 }
 
-double MarketCommand::getQty() const {
+const double& MarketCommand::getQty() const {
     return _qty;
 }
 
-Side MarketCommand::getSide() const {
+const Side& MarketCommand::getSide() const {
     return _side;
 }

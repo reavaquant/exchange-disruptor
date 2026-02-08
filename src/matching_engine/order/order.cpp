@@ -12,12 +12,12 @@ Order::Order(uint64_t clientId, uint64_t orderId, std::string symbol, Side side,
     }
 }
 
-uint64_t Order::getClientId() const { return _clientId; }
-uint64_t Order::getOrderId() const { return _orderId; }
-std::string Order::getSymbol() const { return _symbol; }
-Side Order::getSide() const { return _side; }
-int64_t Order::getPrice() const { return _price; }
-double Order::getQtyRemaining() const { return _qtyRemaining; }
+const uint64_t& Order::getClientId() const { return _clientId; }
+const uint64_t& Order::getOrderId() const { return _orderId; }
+const std::string& Order::getSymbol() const { return _symbol; }
+const Side& Order::getSide() const { return _side; }
+const int64_t& Order::getPrice() const { return _price; }
+const double& Order::getQtyRemaining() const { return _qtyRemaining; }
 bool Order::isFilled() const { return _isFilled; }
 
 double Order::qtyDecrease(double execQty) {

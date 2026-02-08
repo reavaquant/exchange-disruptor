@@ -6,8 +6,8 @@
 class RejectEvent : public Event {
 public:
     RejectEvent(uint64_t clientId, uint64_t orderId, RejectReason reason);
-    EventType getType() const override;
-    RejectReason getReason() const;
+    const EventType& getType() const override;
+    const RejectReason& getReason() const;
 private:
     RejectReason _reason;
 };

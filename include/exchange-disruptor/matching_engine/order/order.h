@@ -7,12 +7,12 @@
 class Order {
 public:
     Order(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, int64_t price, double qtyRemaining);
-    uint64_t getClientId() const;
-    uint64_t getOrderId() const;
-    std::string getSymbol() const;
-    Side getSide() const;
-    int64_t getPrice() const;
-    double getQtyRemaining() const;
+    const uint64_t& getClientId() const;
+    const uint64_t& getOrderId() const;
+    const std::string& getSymbol() const;
+    const Side& getSide() const;
+    const int64_t& getPrice() const;
+    const double& getQtyRemaining() const;
     bool isFilled() const;
     double qtyDecrease(double execQty);
 private:

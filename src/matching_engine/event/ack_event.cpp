@@ -2,6 +2,7 @@
 
 AckEvent::AckEvent(uint64_t clientId, uint64_t orderId) : Event(clientId, orderId) {}
 
-EventType AckEvent::getType() const {
-    return EventType::Ack;
+const EventType& AckEvent::getType() const {
+    static const EventType kType = EventType::Ack;
+    return kType;
 }

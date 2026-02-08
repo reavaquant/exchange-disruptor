@@ -9,8 +9,11 @@ FillEvent::FillEvent(uint64_t clientId, uint64_t orderId, uint64_t matchId, int6
     }
 }
 
-EventType FillEvent::getType() const { return EventType::Fill; }
+const EventType& FillEvent::getType() const {
+    static const EventType kType = EventType::Fill;
+    return kType;
+}
 
-uint64_t FillEvent::getMatchId() const { return _matchId; }
-int64_t FillEvent::getPrice() const { return _price; }
-double FillEvent::getQty() const { return _qty; }
+const uint64_t& FillEvent::getMatchId() const { return _matchId; }
+const int64_t& FillEvent::getPrice() const { return _price; }
+const double& FillEvent::getQty() const { return _qty; }
