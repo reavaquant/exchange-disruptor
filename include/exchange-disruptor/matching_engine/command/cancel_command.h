@@ -6,7 +6,7 @@
 class CancelCommand : public Command {
 public:
     CancelCommand(uint64_t clientId, uint64_t orderId, std::string symbol);
-    const CommandType& getType() const override;
+    CommandType getType() const override;
 };
 
 #endif // CANCEL_COMMAND_H

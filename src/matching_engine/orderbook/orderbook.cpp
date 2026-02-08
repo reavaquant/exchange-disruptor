@@ -2,9 +2,9 @@
 
 OrderBook::OrderBook(std::string symbol) : _bidBook(BookSide::Bid), _askBook(BookSide::Ask), _symbol(symbol) {}
 
-const Book& OrderBook::getBidBook() const { return _bidBook; }
-const Book& OrderBook::getAskBook() const { return _askBook; }
-const std::string& OrderBook::getSymbol() const { return _symbol; }
+const Book& OrderBook::getBidBook() const & { return _bidBook; }
+const Book& OrderBook::getAskBook() const & { return _askBook; }
+const std::string& OrderBook::getSymbol() const & { return _symbol; }
 
 std::optional<RejectReason> OrderBook::addLimit(const Order& order) {
     if (order.getSide() == Side::Buy) {

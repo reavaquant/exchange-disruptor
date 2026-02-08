@@ -6,7 +6,7 @@
 class AckEvent : public Event {
 public:
     AckEvent(uint64_t clientId, uint64_t orderId);
-    const EventType& getType() const override;
+    EventType getType() const override;
 };
 
 #endif // ACK_EVENT_H

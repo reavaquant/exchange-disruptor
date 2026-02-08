@@ -11,9 +11,12 @@ class OrderBook {
 public:
     OrderBook(std::string symbol);
 
-    const Book& getBidBook() const;
-    const Book& getAskBook() const;
-    const std::string& getSymbol() const;
+    const Book& getBidBook() const &;
+    const Book& getBidBook() const && = delete;
+    const Book& getAskBook() const &;
+    const Book& getAskBook() const && = delete;
+    const std::string& getSymbol() const &;
+    const std::string& getSymbol() const && = delete;
 
     std::optional<RejectReason> addLimit(const Order& order); 
     std::optional<RejectReason> cancelOrder(uint64_t orderId, uint64_t clientId);

@@ -2,9 +2,6 @@
 
 RejectEvent::RejectEvent(uint64_t clientId, uint64_t orderId, RejectReason reason) : Event(clientId, orderId), _reason(reason) {}
 
-const EventType& RejectEvent::getType() const {
-    static const EventType kType = EventType::Reject;
-    return kType;
-}
+EventType RejectEvent::getType() const { return EventType::Reject; }
 
-const RejectReason& RejectEvent::getReason() const { return _reason; }
+RejectReason RejectEvent::getReason() const { return _reason; }

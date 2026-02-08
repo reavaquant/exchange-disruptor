@@ -8,9 +8,9 @@ class Event {
 public:
     Event(uint64_t clientId, uint64_t orderId);
     virtual ~Event() = default;
-    virtual const EventType& getType() const = 0;
-    const uint64_t& getClientId() const;
-    const uint64_t& getOrderId() const;
+    virtual EventType getType() const = 0;
+    uint64_t getClientId() const;
+    uint64_t getOrderId() const;
 private:
     uint64_t _clientId;
     uint64_t _orderId;
