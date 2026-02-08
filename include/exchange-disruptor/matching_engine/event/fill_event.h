@@ -5,7 +5,7 @@
 
 class FillEvent : public Event {
 public:
-    FillEvent(uint64_t clientId, uint64_t orderId, uint64_t matchId, int64_t price, double qty) : Event(clientId, orderId), _matchId(matchId), _price(price), _qty(qty) {}
+    FillEvent(uint64_t clientId, uint64_t orderId, uint64_t matchId, int64_t price, double qty);
     EventType getType() const override;
     uint64_t getMatchId() const;
     int64_t getPrice() const;

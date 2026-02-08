@@ -6,7 +6,7 @@
 
 class Event {
 public:
-    Event(uint64_t clientId, uint64_t orderId) : _clientId(clientId), _orderId(orderId) {}
+    Event(uint64_t clientId, uint64_t orderId);
     virtual ~Event() = default;
     virtual EventType getType() const = 0;
     uint64_t getClientId() const;

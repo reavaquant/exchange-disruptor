@@ -3,7 +3,6 @@
 
 #include "order.h"
 #include <map>
-#include <unordered_map>
 #include <list>
 
 enum class BookSide { Bid, Ask };
