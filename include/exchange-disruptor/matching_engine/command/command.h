@@ -6,7 +6,7 @@
 
 class Command {
 public:
-    Command(uint64_t clientId, uint64_t orderId, std::string symbol) : _clientId(clientId), _orderId(orderId), _symbol(symbol) {}
+    Command(uint64_t clientId, uint64_t orderId, std::string symbol);
     virtual ~Command() = default;
     virtual CommandType getType() const = 0;
     uint64_t getClientId() const;

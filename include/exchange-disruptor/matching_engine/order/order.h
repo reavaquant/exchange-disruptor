@@ -6,12 +6,12 @@
 
 class Order {
 public:
-    Order(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, double price, double qtyRemaining) : _clientId(clientId), _orderId(orderId), _symbol(symbol), _side(side), _price(price), _qtyRemaining(qtyRemaining) {}
+    Order(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, int64_t price, double qtyRemaining);
     uint64_t getClientId() const;
     uint64_t getOrderId() const;
     std::string getSymbol() const;
     Side getSide() const;
-    double getPrice() const;
+    int64_t getPrice() const;
     double getQtyRemaining() const;
     bool isFilled() const;
     double qtyDecrease(double execQty);
@@ -20,7 +20,7 @@ private:
     uint64_t _orderId;
     std::string _symbol;
     Side _side;
-    double _price;
+    int64_t _price;
     double _qtyRemaining;
     bool _isFilled{false};
 };  

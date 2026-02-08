@@ -101,6 +101,16 @@ On définit :
   \item \textbf{Fill} : exécution (matchId, price, qty) (partielle ou totale)
 \end{itemize}
 
+\noindent Exigences de structure (OrderBook) :
+\begin{itemize}
+  \item Le carnet est organisé en \textbf{niveaux de prix} (price levels).
+  \item À chaque niveau de prix, les ordres sont stockés en \textbf{FIFO} (time priority).
+  \item Un index interne \textbf{orderId $\rightarrow$ référence} est \textbf{obligatoire} pour implémenter
+        \textbf{Cancel} sans parcourir tout le carnet.
+  \item Les meilleurs prix (\textit{best bid} / \textit{best ask}) doivent être accessibles \textbf{sans scan complet}
+        du carnet.
+\end{itemize}
+
 \subsection*{2. Implementation (classes imposées)}
 \begin{enumerate}
   \item Implémenter \textbf{enum class Side} avec deux valeurs : \texttt{Buy}, \texttt{Sell}.
