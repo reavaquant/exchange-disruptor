@@ -1,9 +1,12 @@
 #ifndef BOOK_H
 #define BOOK_H
 
-#include "order.h"
+#include "matching_engine/order/order.h"
+#include "matching_engine/enum.h"
 #include <map>
 #include <list>
+#include <optional>
+#include <unordered_map>
 
 enum class BookSide { Bid, Ask };
 
@@ -11,14 +14,16 @@ class Book {
 public:
     Book(BookSide side);
 
-    bool addLimit(const Order& order);
-    bool cancelOrder(uint64_t orderId, uint64_t clientId);
+    std::optional<RejectReason> addLimit(const Order& order);
+    std::optional<RejectReason> cancelOrder(uint64_t orderId, uint64_t clientId);
 
     bool empty() const;
-    Order* topOrder();
-    const Order* topOrder() const;
 
-    bool purgeTop();
+    Order* peek();
+    const Order* peek() const;
+    std::optional<int64_t> topPrice() const;
+    bool consume();
+    
 private:
     using Orders = std::list<Order>;
     using Levels = std::map<int64_t, Orders>;

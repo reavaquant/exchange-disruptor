@@ -1,7 +1,7 @@
 #ifndef ORDER_H
 #define ORDER_H
 
-#include "enum.h"
+#include "matching_engine/enum.h"
 #include <string>
 
 class Order {
@@ -9,7 +9,8 @@ public:
     Order(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, int64_t price, double qtyRemaining);
     uint64_t getClientId() const;
     uint64_t getOrderId() const;
-    std::string getSymbol() const;
+    const std::string& getSymbol() const &;
+    const std::string& getSymbol() const && = delete;
     Side getSide() const;
     int64_t getPrice() const;
     double getQtyRemaining() const;

@@ -1,4 +1,4 @@
-#include "order.h"
+#include "matching_engine/order/order.h"
 
 Order::Order(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, int64_t price, double qtyRemaining) : _clientId(clientId), _orderId(orderId), _symbol(symbol), _side(side), _price(price), _qtyRemaining(qtyRemaining) {
     if (price <= 0) {
@@ -14,7 +14,7 @@ Order::Order(uint64_t clientId, uint64_t orderId, std::string symbol, Side side,
 
 uint64_t Order::getClientId() const { return _clientId; }
 uint64_t Order::getOrderId() const { return _orderId; }
-std::string Order::getSymbol() const { return _symbol; }
+const std::string& Order::getSymbol() const & { return _symbol; }
 Side Order::getSide() const { return _side; }
 int64_t Order::getPrice() const { return _price; }
 double Order::getQtyRemaining() const { return _qtyRemaining; }

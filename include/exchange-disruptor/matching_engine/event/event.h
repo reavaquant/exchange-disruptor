@@ -1,8 +1,8 @@
 #ifndef EVENT_H
 #define EVENT_H
 
-#include "enum.h"
-#include "command/command.h"
+#include "matching_engine/enum.h"
+#include "matching_engine/command/command.h"
 
 class Event {
 public:

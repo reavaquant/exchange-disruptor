@@ -1,7 +1,7 @@
 #ifndef MARKET_COMMAND_H
 #define MARKET_COMMAND_H
 
-#include "command.h"
+#include "matching_engine/command/command.h"
 
 class MarketCommand : public Command {
 public:
