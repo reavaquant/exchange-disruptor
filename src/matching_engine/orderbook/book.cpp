@@ -6,15 +6,15 @@ Book::Book(BookSide side) : _side(side) {}
 
 std::optional<RejectReason> Book::addLimit(const Order& order) {
     if (order.getPrice() <= 0) {
-        return RejectReason::InvalidPrice; // Invalid price or quantity
+        return RejectReason::InvalidPrice; 
     }
     if (order.getQtyRemaining() <= 0) {
         return RejectReason::InvalidQuantity;
     }
     if ((order.getSide() == Side::Buy && _side != BookSide::Bid) || (order.getSide() == Side::Sell && _side != BookSide::Ask)) {
-        return RejectReason::InvalidSide; // Order side does not match book side
+        return RejectReason::InternalError; // Order side does not match book side
     }
-    if (_orderIdMap.find(order.getOrderId()) != _orderIdMap.end()) { return RejectReason::DuplicateOrderId; } // Duplicate order ID
+    if (_orderIdMap.find(order.getOrderId()) != _orderIdMap.end()) { return RejectReason::InternalError; } // Duplicate order ID
     auto [levelIt, created] = _book.try_emplace(order.getPrice(), std::list<Order>{});
     levelIt->second.push_back(order);
     _orderIdMap[order.getOrderId()] = {levelIt, std::prev(levelIt->second.end())};
@@ -42,7 +42,7 @@ bool Book::empty() const {
     return _book.empty();
 }
 
-Order* Book::topOrder() {
+Order* Book::peek() {
     if (_book.empty()) {
         return nullptr;
     }
@@ -53,7 +53,7 @@ Order* Book::topOrder() {
     }
 }
 
-const Order* Book::topOrder() const {
+const Order* Book::peek() const {
     if (_book.empty()) {
         return nullptr; // Return nullptr if book is empty to avoid throwing exceptions in const context
     }
@@ -64,7 +64,18 @@ const Order* Book::topOrder() const {
     }
 }
 
-bool Book::purgeTop() {
+std::optional<int64_t> Book::topPrice() const {
+    if (_book.empty()) {
+        return std::nullopt;
+    }
+    if (_side == BookSide::Bid) {
+        return _book.rbegin()->first;
+    } else {
+        return _book.begin()->first;
+    }
+}
+
+bool Book::consume() {
     if (_book.empty()) {
         return false; // Book is empty, nothing to purge
     }

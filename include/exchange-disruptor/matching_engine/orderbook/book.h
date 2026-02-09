@@ -18,10 +18,12 @@ public:
     std::optional<RejectReason> cancelOrder(uint64_t orderId, uint64_t clientId);
 
     bool empty() const;
-    Order* topOrder();
-    const Order* topOrder() const;
 
-    bool purgeTop();
+    Order* peek();
+    const Order* peek() const;
+    std::optional<int64_t> topPrice() const;
+    bool consume();
+    
 private:
     using Orders = std::list<Order>;
     using Levels = std::map<int64_t, Orders>;
