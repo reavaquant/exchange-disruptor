@@ -69,9 +69,9 @@ std::optional<int64_t> Book::topPrice() const {
         return std::nullopt;
     }
     if (_side == BookSide::Bid) {
-        return _book.rbegin()->first;
+        return _book.rbegin()->first; 
     } else {
-        return _book.begin()->first;
+        return _book.begin()->first; 
     }
 }
 

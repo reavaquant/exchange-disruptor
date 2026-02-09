@@ -63,11 +63,19 @@ const Order* OrderBook::peekAsk() const {
 }
 
 std::optional<int64_t> OrderBook::topBidPrice() const {
-    return _bidBook.topPrice();
+    const Order* topBid = _bidBook.peek();
+    if (topBid) {
+        return topBid->getPrice();
+    }
+    return std::nullopt;
 }
 
 std::optional<int64_t> OrderBook::topAskPrice() const {
-    return _askBook.topPrice();
+    const Order* topAsk = _askBook.peek();
+    if (topAsk) {
+        return topAsk->getPrice();
+    }
+    return std::nullopt;
 }
 
 bool OrderBook::consumeBid() {

@@ -5,12 +5,12 @@
 
 class MarketCommand : public Command {
 public:
-    MarketCommand(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, double qty);
+    MarketCommand(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, int64_t qty);
     CommandType getType() const override;
-    double getQty() const;
+    int64_t getQty() const;
     Side getSide() const;
 private:
-    double _qty;
+    int64_t _qty;
     Side _side;
 };
 
