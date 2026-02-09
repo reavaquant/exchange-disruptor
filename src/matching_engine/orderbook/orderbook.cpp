@@ -46,26 +46,50 @@ std::optional<RejectReason> OrderBook::cancelOrder(uint64_t orderId, uint64_t cl
     }
 }
 
-bool OrderBook::purgeBestBid() {
-    auto topBid = _bidBook.topOrder();
+Order* OrderBook::peekBid() {
+    return _bidBook.peek();
+}
+
+const Order* OrderBook::peekBid() const {
+    return _bidBook.peek();
+}
+
+Order* OrderBook::peekAsk() {
+    return _askBook.peek();
+}
+
+const Order* OrderBook::peekAsk() const {
+    return _askBook.peek();
+}
+
+std::optional<int64_t> OrderBook::topBidPrice() const {
+    return _bidBook.topPrice();
+}
+
+std::optional<int64_t> OrderBook::topAskPrice() const {
+    return _askBook.topPrice();
+}
+
+bool OrderBook::consumeBid() {
+    auto topBid = _bidBook.peek();
     if (topBid == nullptr) {
         return false;
     }
     uint64_t orderId = topBid->getOrderId();
-    bool purged = _bidBook.purgeTop();
+    bool purged = _bidBook.consume();
     if (purged) {
         _orderIdToBookSide.erase(orderId);
     }
     return purged;
 }
 
-bool OrderBook::purgeBestAsk() {
-    auto topAsk = _askBook.topOrder();
+bool OrderBook::consumeAsk() {
+    auto topAsk = _askBook.peek();
     if (topAsk == nullptr) {
         return false;
     }
     uint64_t orderId = topAsk->getOrderId();
-    bool purged = _askBook.purgeTop();
+    bool purged = _askBook.consume();
     if (purged) {
         _orderIdToBookSide.erase(orderId);
     }

@@ -20,8 +20,15 @@ public:
 
     std::optional<RejectReason> addLimit(const Order& order); 
     std::optional<RejectReason> cancelOrder(uint64_t orderId, uint64_t clientId);
-    bool purgeBestBid();
-    bool purgeBestAsk();
+
+    Order* peekBid();
+    const Order* peekBid() const;
+    Order* peekAsk();
+    const Order* peekAsk() const;
+    std::optional<int64_t> topBidPrice() const;
+    std::optional<int64_t> topAskPrice() const;
+    bool consumeBid();
+    bool consumeAsk();
 
 private:
     std::string _symbol;

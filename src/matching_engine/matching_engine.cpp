@@ -44,7 +44,41 @@ std::vector<Event> MatchingEngine::process(const Command& cmd) {
         }
         case CommandType::Market: {
             const MarketCommand& marketCmd = static_cast<const MarketCommand&>(cmd);
-            Order marketOrder(marketCmd.getClientId(), marketCmd.getOrderId(), marketCmd.getSymbol(), marketCmd.getSide(), 0, marketCmd.getQty());
+            const auto& side = marketCmd.getSide();
+            const auto& price = side == Side::Buy ? _orderBook.topAskPrice() : _orderBook.topBidPrice();
+
+            if (!price) {
+                events.emplace_back(RejectEvent(cmd.getClientId(), cmd.getOrderId(), RejectReason::InvalidPrice)); // No price available to execute against
+                return events;
+            }
+            Order marketOrder(marketCmd.getClientId(), marketCmd.getOrderId(), marketCmd.getSymbol(), side, *price, marketCmd.getQty());
+            double qtyRemaining = marketOrder.getQtyRemaining();
+
+            while (qtyRemaining > 0) {
+                Order* topOrder = marketCmd.getSide() == Side::Buy ? _orderBook.peekAsk() : _orderBook.peekBid();
+                if (topOrder == nullptr) {
+                    break; // No more orders to match against
+                }
+                int64_t execPrice = topOrder->getPrice();
+                double adverseQty = topOrder->getQtyRemaining();
+                double execQty = std::min(qtyRemaining, adverseQty);
+                if (execQty == adverseQty) {
+                    // full fill top order
+                    side == Side::Buy ? _orderBook.consumeAsk() : _orderBook.consumeBid(); // Remove the top order
+                    events.emplace_back(FillEvent(topOrder->getClientId(), topOrder->getOrderId(), /*matchId=*/0, execPrice, execQty));
+                    events.emplace_back(FillEvent(marketOrder.getClientId(), marketOrder.getOrderId(), /*matchId=*/0, execPrice, execQty));
+                    marketOrder.qtyDecrease(execQty);
+                    continue;
+                } else {
+                    // partial fill
+                    topOrder->qtyDecrease(execQty);
+                    marketOrder.qtyDecrease(execQty);
+                    events.emplace_back(FillEvent(topOrder->getClientId(), topOrder->getOrderId(), /*matchId=*/0, execPrice, execQty));
+                    events.emplace_back(FillEvent(marketOrder.getClientId(), marketOrder.getOrderId(), /*matchId=*/0, execPrice, execQty));
+                    continue;
+                }
+            }
+            events.emplace_back(AckEvent(cmd.getClientId(), cmd.getOrderId()));
             break;
         }
     }
