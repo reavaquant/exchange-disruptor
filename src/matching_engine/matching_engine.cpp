@@ -46,28 +46,27 @@ std::vector<std::unique_ptr<Event>> MatchingEngine::process(const Command& cmd) 
         case CommandType::Market: {
             const MarketCommand& marketCmd = static_cast<const MarketCommand&>(cmd);
             const auto& side = marketCmd.getSide();
-            const auto& price = side == Side::Buy ? _orderBook.topAskPrice() : _orderBook.topBidPrice();
-
-            if (!price) {
-                events.emplace_back(std::make_unique<AckEvent>(cmd.getClientId(), cmd.getOrderId())); // No liquidity
-                return events;
-            }
-            events.emplace_back(std::make_unique<AckEvent>(cmd.getClientId(), cmd.getOrderId()));
-            
+            const auto& cmdClientId = marketCmd.getClientId();
+            const auto& cmdOrderId = marketCmd.getOrderId();
             int64_t qtyRemaining = marketCmd.getQty();
+
+            events.emplace_back(std::make_unique<AckEvent>(cmdClientId, cmdOrderId));
 
             while (qtyRemaining > 0) {
                 Order* topOrder = marketCmd.getSide() == Side::Buy ? _orderBook.peekAsk() : _orderBook.peekBid();
                 if (topOrder == nullptr) {
-                    break; // No more orders to match against
+                    break; // No more liquidity, exit loop
                 }
+                uint64_t topOrderClientId = topOrder->getClientId();
+                uint64_t topOrderId = topOrder->getOrderId();
                 int64_t execPrice = topOrder->getPrice();
                 int64_t adverseQty = topOrder->getQtyRemaining();
                 int64_t execQty = std::min(qtyRemaining, adverseQty);
+
                 if (execQty == adverseQty) {
                     // full fill top order
-                    events.emplace_back(std::make_unique<FillEvent>(topOrder->getClientId(), topOrder->getOrderId(), _matchId, execPrice, execQty));
-                    events.emplace_back(std::make_unique<FillEvent>(marketCmd.getClientId(), marketCmd.getOrderId(), _matchId, execPrice, execQty));
+                    events.emplace_back(std::make_unique<FillEvent>(topOrderClientId, topOrderId, _matchId, execPrice, execQty));
+                    events.emplace_back(std::make_unique<FillEvent>(cmdClientId, cmdOrderId, _matchId, execPrice, execQty));
                     side == Side::Buy ? _orderBook.consumeAsk() : _orderBook.consumeBid(); // Remove the top order
                     qtyRemaining -= execQty;
                     _matchId++;
@@ -76,10 +75,10 @@ std::vector<std::unique_ptr<Event>> MatchingEngine::process(const Command& cmd) 
                     // partial fill
                     topOrder->qtyDecrease(execQty);
                     qtyRemaining -= execQty;
-                    events.emplace_back(std::make_unique<FillEvent>(topOrder->getClientId(), topOrder->getOrderId(), _matchId, execPrice, execQty));
-                    events.emplace_back(std::make_unique<FillEvent>(marketCmd.getClientId(), marketCmd.getOrderId(), _matchId, execPrice, execQty));
+                    events.emplace_back(std::make_unique<FillEvent>(topOrderClientId, topOrderId, _matchId, execPrice, execQty));
+                    events.emplace_back(std::make_unique<FillEvent>(cmdClientId, cmdOrderId, _matchId, execPrice, execQty));
                     _matchId++;
-                    continue;
+                    break;
                 }
             }
             break;
