@@ -5,20 +5,10 @@
 Book::Book(BookSide side) : _side(side) {}
 
 std::optional<RejectReason> Book::addLimit(const Order& order) {
-    if (order.getPrice() <= 0) {
-        return RejectReason::InvalidPrice; 
-    }
-    if (order.getQtyRemaining() <= 0) {
-        return RejectReason::InvalidQuantity;
-    }
-    if ((order.getSide() == Side::Buy && _side != BookSide::Bid) || (order.getSide() == Side::Sell && _side != BookSide::Ask)) {
-        return RejectReason::InternalError; // Order side does not match book side
-    }
-    if (_orderIdMap.find(order.getOrderId()) != _orderIdMap.end()) { return RejectReason::InternalError; } // Duplicate order ID
     auto [levelIt, created] = _book.try_emplace(order.getPrice(), std::list<Order>{});
     levelIt->second.push_back(order);
-    _orderIdMap[order.getOrderId()] = {levelIt, std::prev(levelIt->second.end())};
-    return std::nullopt; 
+    _orderIdMap[order.getOrderId()] = {levelIt, std::prev(levelIt->second.end())}; 
+    return std::nullopt;
 }
 
 std::optional<RejectReason> Book::cancelOrder(uint64_t orderId, uint64_t clientId) { 

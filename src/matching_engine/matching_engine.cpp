@@ -7,12 +7,13 @@
 #include "matching_engine/event/reject_event.h"
 #include "matching_engine/event/fill_event.h"
 #include "matching_engine/event/ack_event.h"
+#include "matching_engine/reject_exception.h"
 
 #include <memory>
 #include <vector>
 
 
-MatchingEngine::MatchingEngine(std::string symbol) : _orderBook(symbol) {}
+MatchingEngine::MatchingEngine(std::string symbol) : _symbol(symbol), _orderBook(symbol) {}
 
 std::vector<std::unique_ptr<Event>> MatchingEngine::process(const Command& cmd) { // TODO: Implementer un type de retour plus perf plus tard
     std::vector<std::unique_ptr<Event>> events;
@@ -24,13 +25,18 @@ std::vector<std::unique_ptr<Event>> MatchingEngine::process(const Command& cmd) 
         events.emplace_back(std::make_unique<RejectEvent>(cmdClientId, cmdOrderId, RejectReason::UnknownSymbol));
         return events;
     }
-    
+
     switch (cmd.getType()) {
         case CommandType::Limit: {
             const LimitCommand& limitCmd = static_cast<const LimitCommand&>(cmd);
             const Side cmdSide = limitCmd.getSide();
             const int64_t cmdPrice = limitCmd.getPrice();
             int64_t cmdQtyRemaining = limitCmd.getQty();
+
+            if (_orderBook.hasOrderId(cmdOrderId)) {
+                events.emplace_back(std::make_unique<RejectEvent>(cmdClientId, cmdOrderId, RejectReason::InternalError)); // Duplicate order ID
+                break;
+            }
 
             while (cmdQtyRemaining > 0) {
                 Order* topOrder = cmdSide == Side::Buy ? _orderBook.peekAsk() : _orderBook.peekBid();

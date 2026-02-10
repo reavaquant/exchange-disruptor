@@ -14,7 +14,6 @@ public:
     Side getSide() const;
     int64_t getPrice() const;
     int64_t getQtyRemaining() const;
-    bool isFilled() const;
     int64_t qtyDecrease(int64_t execQty);
 private:
     uint64_t _clientId;
@@ -23,7 +22,6 @@ private:
     Side _side;
     int64_t _price;
     int64_t _qtyRemaining;
-    bool _isFilled{false};
 };  
 
 

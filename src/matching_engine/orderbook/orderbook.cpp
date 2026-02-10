@@ -7,9 +7,6 @@ const Book& OrderBook::getAskBook() const & { return _askBook; }
 const std::string& OrderBook::getSymbol() const & { return _symbol; }
 
 std::optional<RejectReason> OrderBook::addLimit(const Order& order) {
-    if(order.getSymbol() != _symbol) {
-        return RejectReason::UnknownSymbol; // Symbol mismatch
-    }
     if (order.getSide() == Side::Buy) {
         auto rejectReason = _bidBook.addLimit(order);
         if (!rejectReason) {
@@ -102,4 +99,8 @@ bool OrderBook::consumeAsk() {
         _orderIdToBookSide.erase(orderId);
     }
     return purged;
+}
+
+bool OrderBook::hasOrderId(uint64_t orderId) const {
+    return _orderIdToBookSide.find(orderId) != _orderIdToBookSide.end();
 }

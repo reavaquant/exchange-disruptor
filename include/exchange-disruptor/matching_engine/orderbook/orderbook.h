@@ -30,6 +30,8 @@ public:
     bool consumeBid();
     bool consumeAsk();
 
+    bool hasOrderId(uint64_t orderId) const;
+
 private:
     std::string _symbol;
     Book _bidBook;
