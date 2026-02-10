@@ -12,6 +12,8 @@
 #include <memory>
 #include <vector>
 
+uint64_t MatchingEngine::_matchId = 1;
+
 
 MatchingEngine::MatchingEngine(std::string symbol) : _symbol(symbol), _orderBook(symbol) {}
 
@@ -87,9 +89,9 @@ std::vector<std::unique_ptr<Event>> MatchingEngine::process(const Command& cmd) 
             const CancelCommand& cancelCmd = static_cast<const CancelCommand&>(cmd);
             auto rejectReason = _orderBook.cancelOrder(cancelCmd.getOrderId(), cancelCmd.getClientId());
             if (rejectReason) {
-                events.emplace_back(std::make_unique<RejectEvent>(cmd.getClientId(), cmd.getOrderId(), *rejectReason));
+                events.emplace_back(std::make_unique<RejectEvent>(cmdClientId, cmdOrderId, *rejectReason));
             } else {
-                events.emplace_back(std::make_unique<AckEvent>(cmd.getClientId(), cmd.getOrderId()));
+                events.emplace_back(std::make_unique<AckEvent>(cmdClientId, cmdOrderId));
             }
             break;
         }
