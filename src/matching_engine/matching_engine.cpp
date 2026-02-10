@@ -16,21 +16,65 @@ MatchingEngine::MatchingEngine(std::string symbol) : _orderBook(symbol) {}
 
 std::vector<std::unique_ptr<Event>> MatchingEngine::process(const Command& cmd) { // TODO: Implementer un type de retour plus perf plus tard
     std::vector<std::unique_ptr<Event>> events;
-    if (cmd.getSymbol() != _symbol) {
-        events.emplace_back(std::make_unique<RejectEvent>(cmd.getClientId(), cmd.getOrderId(), RejectReason::UnknownSymbol));
+
+    const u_int64_t cmdClientId = cmd.getClientId();
+    const uint64_t cmdOrderId = cmd.getOrderId();
+    const auto& cmdSymbol = cmd.getSymbol();
+    if (cmdSymbol != _symbol) {
+        events.emplace_back(std::make_unique<RejectEvent>(cmdClientId, cmdOrderId, RejectReason::UnknownSymbol));
         return events;
     }
+    
     switch (cmd.getType()) {
         case CommandType::Limit: {
             const LimitCommand& limitCmd = static_cast<const LimitCommand&>(cmd);
-            Order order(limitCmd.getClientId(), limitCmd.getOrderId(), limitCmd.getSymbol(), limitCmd.getSide(), limitCmd.getPrice(), limitCmd.getQty());
-            //look if crosses and generate FillEvents here before adding to book
-            auto rejectReason = _orderBook.addLimit(order);
-            if (rejectReason) {
-                events.emplace_back(std::make_unique<RejectEvent>(cmd.getClientId(), cmd.getOrderId(), *rejectReason));
-            } else {
-                // If the order was accepted, we would normally check for matches and generate FillEvents here
+            const Side cmdSide = limitCmd.getSide();
+            const int64_t cmdPrice = limitCmd.getPrice();
+            int64_t cmdQtyRemaining = limitCmd.getQty();
+
+            while (cmdQtyRemaining > 0) {
+                Order* topOrder = cmdSide == Side::Buy ? _orderBook.peekAsk() : _orderBook.peekBid();
+                if (topOrder == nullptr) {
+                    break; // No more liquidity, exit loop
+                }
+                if ((cmdSide == Side::Buy && topOrder->getPrice() > cmdPrice) || (cmdSide == Side::Sell && topOrder->getPrice() < cmdPrice)) {
+                    break; // end cross status
+                }
+
+                uint64_t topOrderClientId = topOrder->getClientId();
+                uint64_t topOrderId = topOrder->getOrderId();
+                int64_t execPrice = topOrder->getPrice();
+                int64_t adverseQty = topOrder->getQtyRemaining();
+                int64_t execQty = std::min(cmdQtyRemaining, adverseQty);
+
+                if (execQty == adverseQty) {
+                    // full fill top order
+                    events.emplace_back(std::make_unique<FillEvent>(topOrderClientId, topOrderId, _matchId, execPrice, execQty));
+                    events.emplace_back(std::make_unique<FillEvent>(cmdClientId, cmdOrderId, _matchId, execPrice, execQty));
+                    cmdSide == Side::Buy ? _orderBook.consumeAsk() : _orderBook.consumeBid(); // Remove the top order
+                    cmdQtyRemaining -= execQty;
+                    _matchId++;
+                    continue;
+                } else {
+                    // partial fill
+                    topOrder->qtyDecrease(execQty);
+                    cmdQtyRemaining -= execQty;
+                    events.emplace_back(std::make_unique<FillEvent>(topOrderClientId, topOrderId, _matchId, execPrice, execQty));
+                    events.emplace_back(std::make_unique<FillEvent>(cmdClientId, cmdOrderId, _matchId, execPrice, execQty));
+                    _matchId++;
+                    break;
+                }
             }
+
+            if (cmdQtyRemaining > 0) {
+                Order limitOrder(cmdClientId, cmdOrderId, cmdSymbol, cmdSide, cmdPrice, cmdQtyRemaining); // at which price we set the remaining qty in the book ?
+                auto rejectReason = _orderBook.addLimit(limitOrder);
+                if (rejectReason) {
+                    events.emplace_back(std::make_unique<RejectEvent>(cmdClientId, cmdOrderId, *rejectReason));
+                    break;
+                }
+            }
+            events.emplace_back(std::make_unique<AckEvent>(cmdClientId, cmdOrderId));
             break;
         }
         case CommandType::Cancel: {
@@ -45,15 +89,13 @@ std::vector<std::unique_ptr<Event>> MatchingEngine::process(const Command& cmd) 
         }
         case CommandType::Market: {
             const MarketCommand& marketCmd = static_cast<const MarketCommand&>(cmd);
-            const auto& side = marketCmd.getSide();
-            const auto& cmdClientId = marketCmd.getClientId();
-            const auto& cmdOrderId = marketCmd.getOrderId();
-            int64_t qtyRemaining = marketCmd.getQty();
+            const Side cmdSide = marketCmd.getSide();
+            int64_t cmdQtyRemaining = marketCmd.getQty();
 
             events.emplace_back(std::make_unique<AckEvent>(cmdClientId, cmdOrderId));
 
-            while (qtyRemaining > 0) {
-                Order* topOrder = marketCmd.getSide() == Side::Buy ? _orderBook.peekAsk() : _orderBook.peekBid();
+            while (cmdQtyRemaining > 0) {
+                Order* topOrder = cmdSide == Side::Buy ? _orderBook.peekAsk() : _orderBook.peekBid();
                 if (topOrder == nullptr) {
                     break; // No more liquidity, exit loop
                 }
@@ -61,20 +103,20 @@ std::vector<std::unique_ptr<Event>> MatchingEngine::process(const Command& cmd) 
                 uint64_t topOrderId = topOrder->getOrderId();
                 int64_t execPrice = topOrder->getPrice();
                 int64_t adverseQty = topOrder->getQtyRemaining();
-                int64_t execQty = std::min(qtyRemaining, adverseQty);
+                int64_t execQty = std::min(cmdQtyRemaining, adverseQty);
 
                 if (execQty == adverseQty) {
                     // full fill top order
                     events.emplace_back(std::make_unique<FillEvent>(topOrderClientId, topOrderId, _matchId, execPrice, execQty));
                     events.emplace_back(std::make_unique<FillEvent>(cmdClientId, cmdOrderId, _matchId, execPrice, execQty));
-                    side == Side::Buy ? _orderBook.consumeAsk() : _orderBook.consumeBid(); // Remove the top order
-                    qtyRemaining -= execQty;
+                    cmdSide == Side::Buy ? _orderBook.consumeAsk() : _orderBook.consumeBid(); // Remove the top order
+                    cmdQtyRemaining -= execQty;
                     _matchId++;
                     continue;
                 } else {
                     // partial fill
                     topOrder->qtyDecrease(execQty);
-                    qtyRemaining -= execQty;
+                    cmdQtyRemaining -= execQty;
                     events.emplace_back(std::make_unique<FillEvent>(topOrderClientId, topOrderId, _matchId, execPrice, execQty));
                     events.emplace_back(std::make_unique<FillEvent>(cmdClientId, cmdOrderId, _matchId, execPrice, execQty));
                     _matchId++;
