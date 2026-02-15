@@ -1,11 +1,11 @@
 #ifndef ACK_EVENT_H
 #define ACK_EVENT_H
 
-#include "event.h"
+#include "matching_engine/event/event.h"
 
 class AckEvent : public Event {
 public:
-    AckEvent(uint64_t clientId, uint64_t orderId) : Event(clientId, orderId) {}
+    AckEvent(uint64_t clientId, uint64_t orderId);
     EventType getType() const override;
 };
 

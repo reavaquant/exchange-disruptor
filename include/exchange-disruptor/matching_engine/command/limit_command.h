@@ -1,19 +1,19 @@
 #ifndef LIMIT_COMMAND_H
 #define LIMIT_COMMAND_H
 
-#include "command.h"
+#include "matching_engine/command/command.h"
 
 class LimitCommand : public Command {
 public:
-    LimitCommand(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, double price, double qty) : Command(clientId, orderId, symbol), _price(price), _qty(qty), _side(side) {}
+    LimitCommand(uint64_t clientId, uint64_t orderId, std::string symbol, Side side, int64_t price, int64_t qty);
     CommandType getType() const override;
-    double getPrice() const;
-    double getQty() const;
+    int64_t getPrice() const;
+    int64_t getQty() const;
     Side getSide() const;
 
 private:
-    double _price;
-    double _qty;
+    int64_t _price;
+    int64_t _qty;
     Side _side;
 };
 
