@@ -4,7 +4,6 @@
 #include "matching_engine/orderbook/orderbook.h"
 #include "matching_engine/command/command.h"
 #include "matching_engine/event/event.h"
-#include <memory>
 #include <vector>
 
 class MatchingEngine {

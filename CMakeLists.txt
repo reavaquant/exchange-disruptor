@@ -33,11 +33,11 @@ set(EXCHANGE_DISRUPTOR_SRC
   src/matching_engine/command/command.cpp
   src/matching_engine/command/limit_command.cpp
   src/matching_engine/command/market_command.cpp
+  src/matching_engine/reject_exception.cpp
   src/matching_engine/event/reject_event.cpp
   src/matching_engine/event/fill_event.cpp
   src/matching_engine/event/event.cpp
   src/matching_engine/event/ack_event.cpp
-  src/matching_engine/matching_engine.cpp
 )
 
 add_library(exchange_disruptor_lib ${EXCHANGE_DISRUPTOR_SRC})
