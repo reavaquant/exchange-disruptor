@@ -9,7 +9,7 @@ public:
     Framer();
 
     std::vector<std::uint8_t> frame(const std::vector<std::uint8_t>& payloadBytes);
-    std::vector<std::uint8_t> consume(const std::vector<std::uint8_t> buffer);
+    std::vector<std::vector<uint8_t>> consume(const std::vector<std::uint8_t>& buffer);
 };
 
 #endif // FRAMER_H

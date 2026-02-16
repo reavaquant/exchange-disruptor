@@ -16,3 +16,7 @@ std::vector<std::uint8_t> frame(const std::vector<std::uint8_t>& payloadBytes) {
     std::copy(payloadBytes.begin(), payloadBytes.end(), framedBytes.begin() + 4);
     return framedBytes;
 }
+
+std::vector<std::vector<uint8_t>> consume(const std::vector<std::uint8_t>& buffer) {
+    return std::vector<std::vector<uint8_t>>{};
+}
