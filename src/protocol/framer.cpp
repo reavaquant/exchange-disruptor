@@ -12,7 +12,7 @@ std::vector<std::uint8_t> Framer::frame(const std::vector<std::uint8_t>& payload
     framedBytes[0] = static_cast<uint8_t>((len >> 24) & 0xFF);
     framedBytes[1] = static_cast<uint8_t>((len >> 16) & 0xFF);
     framedBytes[2] = static_cast<uint8_t>((len >> 8) & 0xFF);
-    framedBytes[3] = static_cast<uint8_t>( len & 0xFF);
+    framedBytes[3] = static_cast<uint8_t>(len & 0xFF);
     std::copy(payloadBytes.begin(), payloadBytes.end(), framedBytes.begin() + 4);
     return framedBytes;
 }
@@ -22,10 +22,12 @@ std::vector<std::vector<uint8_t>> Framer::consume(const std::vector<std::uint8_t
     std::vector<std::vector<uint8_t>> messages;
     while (_buffer.size() - _headerPos >= kHeaderSize) {
         uint32_t len = (uint32_t(_buffer[_headerPos + 0]) << 24) | (uint32_t(_buffer[_headerPos + 1]) << 16) | (uint32_t(_buffer[_headerPos + 2]) <<  8) | (uint32_t(_buffer[_headerPos + 3]));
-        if (_buffer.size() - _headerPos < kHeaderSize + len) {
+        if (len > 1024) { //bad frame size
+            _buffer.clear();
+            _headerPos = 0;
             break;
         }
-        if (len >= 1024) { //bad frame size
+        if (_buffer.size() - _headerPos < kHeaderSize + len) {
             break;
         }
         std::vector<uint8_t> message(len);

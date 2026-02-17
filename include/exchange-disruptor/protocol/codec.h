@@ -6,7 +6,6 @@
 
 #include "matching_engine/command/command.h"
 #include "matching_engine/event/event.h"
-#include "protocol/framer.h"
 
 class Codec {
 public:
