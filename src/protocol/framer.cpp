@@ -17,7 +17,7 @@ std::vector<std::uint8_t> Framer::frame(const std::vector<std::uint8_t>& payload
     return framedBytes;
 }
 
-std::vector<std::vector<uint8_t>> Framer::consume(const std::vector<std::uint8_t>& buffer) {
+std::vector<std::vector<uint8_t>> Framer::consume(const std::vector<std::uint8_t>& buffer) { // pas mega optimal : ring buffer+std::span for V2
     _buffer.insert(_buffer.end(), buffer.begin(), buffer.end());
     std::vector<std::vector<uint8_t>> messages;
     while (_buffer.size() - _headerPos >= kHeaderSize) {
