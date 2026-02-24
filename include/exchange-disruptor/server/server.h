@@ -12,6 +12,7 @@ public:
     Server(IPVersion ipv, uint16_t port);
     ~Server();
 
+    int run();
 private:
     IPVersion _ipv;
     uint16_t _port;

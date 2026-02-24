@@ -1,4 +1,5 @@
 #include "server/server.h"
+#include <iostream>
 
 Server::Server(IPVersion ipv, uint16_t port) : _ipv(ipv), _port(port), _acceptor(_ioContext, boost::asio::ip::tcp::endpoint(ipv == IPVersion::IPv4 ? boost::asio::ip::tcp::v4() : boost::asio::ip::tcp::v6(), port)) {
     doAccept();
@@ -14,4 +15,18 @@ void Server::doAccept() {
         }
         doAccept(); // Accept the next connection
     });
+}
+
+int Server::run() {
+    try
+    {
+        doAccept();
+        _ioContext.run();
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return -1;
+    }
+    return 0;
 }
