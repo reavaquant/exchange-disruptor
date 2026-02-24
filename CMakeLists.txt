@@ -47,6 +47,7 @@ set(EXCHANGE_DISRUPTOR_SRC
   src/protocol/codec.cpp
   src/protocol/framer.cpp
   src/server/server.cpp
+  src/server/connection.cpp
 )
 
 add_library(exchange_disruptor_lib ${EXCHANGE_DISRUPTOR_SRC})
