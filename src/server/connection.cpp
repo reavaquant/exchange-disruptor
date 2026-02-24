@@ -1,9 +1,10 @@
 #include "server/connection.h"
-#include <iostream>
 
-Connection::Connection(boost::asio::ip::tcp::socket socket) : _socket(std::move(socket)) {}
+Connection::Connection(boost::asio::io_context& ioContext) : _socket(ioContext) {}
 
-Connection::~Connection() = default;
+Connection::pointer Connection::create(boost::asio::io_context& ioContext) {
+    return Connection::pointer(new Connection(ioContext));
+}
 
 void Connection::start() {
     // Start reading from the socket or writing to it as needed
@@ -15,4 +16,16 @@ void Connection::stop() {
 
 boost::asio::ip::tcp::socket& Connection::socket() {
     return _socket;
+}
+
+void Connection::doReadHeader() {
+    // Read the header from the socket
+}
+
+void Connection::doReadBody() {
+    // Read the body from the socket
+}
+
+void Connection::doWrite() {
+    // Write data to the socket
 }
