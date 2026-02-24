@@ -19,7 +19,7 @@ private:
     boost::asio::io_context _ioContext;
     boost::asio::ip::tcp::acceptor _acceptor;
 
-    void startAccept();
+    void doAccept();
 };
 
 #endif // SERVER_H
