@@ -1,9 +1,9 @@
 #include "server/connection.h"
 
-Connection::Connection(boost::asio::io_context& ioContext) : _socket(ioContext) {}
+Connection::Connection(boost::asio::io_context& ioContext, Codec& codec) : _socket(ioContext), _codec(codec) {}
 
-Connection::pointer Connection::create(boost::asio::io_context& ioContext) {
-    return Connection::pointer(new Connection(ioContext));
+Connection::pointer Connection::create(boost::asio::io_context& ioContext, Codec& codec) {
+    return Connection::pointer(std::make_shared<Connection>(ioContext, codec));
 }
 
 void Connection::start() {
@@ -27,6 +27,9 @@ void Connection::doRead() { // Read data from the socket
                 std::vector<std::vector<uint8_t>> messages = _framer.consume(std::span<const uint8_t>(_buffer.data(), length));
                 (void)messages; // Process the data read from the socket
                 // TODO: iterate on messages, decode them, and push responses to _writeQueue (next will be IN_BUS of disruptor)
+                for (const auto& msg : messages) {
+                    std::unique_ptr<Command> cmd = _codec.decodeCommand(msg);
+                }
                 doRead();
             } else {
                 // TODO: Handle error (e.g., close the connection)
