@@ -2,6 +2,11 @@
 #define CONNECTION_H
 
 #include <boost/asio.hpp>
+#include <array>
+#include <stdint.h>
+#include <deque>
+#include <vector>
+#include "protocol/framer.h"
 
 class Connection : public std::enable_shared_from_this<Connection> {
 public:
@@ -16,12 +21,13 @@ public:
 private:
     explicit Connection(boost::asio::io_context& ioContext);
 
-    void doReadHeader();
-    void doReadBody();
+    void doRead();
     void doWrite();
 
     boost::asio::ip::tcp::socket _socket;
-    // ajout d'un truc qui doit lire ou ecrire pour command ou event
+    std::array<uint8_t, 4096> _buffer; // reading data
+    Framer _framer; // message framing
+    std::deque<std::vector<uint8_t>> _writeQueue; // outgoing payloads queue
 };
 
 #endif // CONNECTION_H

@@ -1,6 +1,6 @@
 #include "protocol/framer.h"
+#include <algorithm>
 #include <stdint.h>
-#include <vector>
 
 Framer::Framer() {}
 
@@ -17,7 +17,7 @@ std::vector<std::uint8_t> Framer::frame(const std::vector<std::uint8_t>& payload
     return framedBytes;
 }
 
-std::vector<std::vector<uint8_t>> Framer::consume(const std::vector<std::uint8_t>& buffer) { // pas mega optimal : ring buffer+std::span for V2
+std::vector<std::vector<uint8_t>> Framer::consume(std::span<const uint8_t> buffer) { // ring buffer for v2
     _buffer.insert(_buffer.end(), buffer.begin(), buffer.end());
     std::vector<std::vector<uint8_t>> messages;
     while (_buffer.size() - _headerPos >= kHeaderSize) {
@@ -44,4 +44,8 @@ std::vector<std::vector<uint8_t>> Framer::consume(const std::vector<std::uint8_t
         messages.push_back(message);
     }
     return messages;
+}
+
+constexpr std::size_t Framer::getHeaderSize() {
+    return kHeaderSize;
 }

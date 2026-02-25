@@ -8,6 +8,7 @@ Connection::pointer Connection::create(boost::asio::io_context& ioContext) {
 
 void Connection::start() {
     // Start reading from the socket or writing to it as needed
+    doRead();
 }
 
 void Connection::stop() {
@@ -18,12 +19,19 @@ boost::asio::ip::tcp::socket& Connection::socket() {
     return _socket;
 }
 
-void Connection::doReadHeader() {
-    // Read the header from the socket
-}
-
-void Connection::doReadBody() {
-    // Read the body from the socket
+void Connection::doRead() { // Read data from the socket
+    auto self(shared_from_this());
+    _socket.async_read_some(boost::asio::buffer(_buffer),
+        [this, self](boost::system::error_code ec, std::size_t length) {
+            if (!ec) {
+                std::vector<std::vector<uint8_t>> messages = _framer.consume(std::span<const uint8_t>(_buffer.data(), length));
+                (void)messages; // Process the data read from the socket
+                // TODO: iterate on messages, decode them, and push responses to _writeQueue (next will be IN_BUS of disruptor)
+                doRead();
+            } else {
+                // TODO: Handle error (e.g., close the connection)
+            }
+        });
 }
 
 void Connection::doWrite() {
