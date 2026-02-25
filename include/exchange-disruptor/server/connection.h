@@ -8,19 +8,20 @@
 #include <vector>
 #include "protocol/framer.h"
 #include "protocol/codec.h"
+#include "matching_engine/matching_engine.h"
 
 class Connection : public std::enable_shared_from_this<Connection> {
 public:
     typedef std::shared_ptr<Connection> pointer;
 
-    static pointer create(boost::asio::io_context& ioContext, Codec& codec);
+    static pointer create(boost::asio::io_context& ioContext, Codec& codec, MatchingEngine& matchingEngine);
 
     void start();
     void stop();
     boost::asio::ip::tcp::socket& socket();
 
 private:
-    explicit Connection(boost::asio::io_context& ioContext, Codec& codec);
+    explicit Connection(boost::asio::io_context& ioContext, Codec& codec, MatchingEngine& matchingEngine);
 
     void doRead();
     void doWrite();
@@ -29,6 +30,7 @@ private:
     std::array<uint8_t, 4096> _buffer; 
     Framer _framer;
     Codec& _codec;
+    MatchingEngine& _matchingEngine;
     std::deque<std::vector<uint8_t>> _writeQueue; // outgoing payloads queue
 };
 
