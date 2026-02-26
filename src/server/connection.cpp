@@ -16,8 +16,6 @@ void Connection::start() {
 
 void Connection::stop() {
     _writeInProgress = false;
-    _writeQueue.clear();
-
     if (!_socket.is_open()) {
         return;
     }
@@ -81,7 +79,7 @@ void Connection::enqueueRsp(std::vector<uint8_t> rsp) {
 
     const bool startWrite = !_writeQueue.empty();
     _writeQueue.push_back(std::move(rsp));
-    if (!_writeInProgress) {
+    if (!startWrite) {
         _writeInProgress = true;
         doWrite();
     }
