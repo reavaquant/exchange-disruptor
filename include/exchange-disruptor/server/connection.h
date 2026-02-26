@@ -24,10 +24,10 @@ public:
 private:
     explicit Connection(boost::asio::io_context& ioContext, Codec& codec, MatchingEngine& matchingEngine);
 
-    void doRead();
+    void asyncRead();
     void handleCmd(const Command& cmd);
     void enqueueRsp(std::vector<uint8_t> rsp);
-    void doWrite();
+    void asyncWrite();
 
     boost::asio::ip::tcp::socket _socket;
     std::array<uint8_t, 4096> _buffer; 

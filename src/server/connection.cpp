@@ -11,7 +11,7 @@ Connection::pointer Connection::create(boost::asio::io_context& ioContext, Codec
 
 void Connection::start() {
     // Start reading from the socket or writing to it as needed
-    doRead();
+    asyncRead();
 }
 
 void Connection::stop() {
@@ -31,7 +31,7 @@ boost::asio::ip::tcp::socket& Connection::socket() {
     return _socket;
 }
 
-void Connection::doRead() { // Read data from the socket
+void Connection::asyncRead() { // Read data from the socket
     auto self(shared_from_this());
     _socket.async_read_some(boost::asio::buffer(_buffer),
         [this, self](boost::system::error_code ec, std::size_t length) {
@@ -51,7 +51,7 @@ void Connection::doRead() { // Read data from the socket
                     }
                     handleCmd(*cmd);
                 }
-                doRead();
+                asyncRead();
             } else {
                 stop();
             }
@@ -81,11 +81,11 @@ void Connection::enqueueRsp(std::vector<uint8_t> rsp) {
     _writeQueue.push_back(std::move(rsp));
     if (!startWrite) {
         _writeInProgress = true;
-        doWrite();
+        asyncWrite();
     }
 }
 
-void Connection::doWrite() {
+void Connection::asyncWrite() {
     if (_writeQueue.empty()) {
         _writeInProgress = false;
         return;
@@ -97,7 +97,7 @@ void Connection::doWrite() {
             if (!ec) {
                 _writeQueue.pop_front();
                 if (!_writeQueue.empty()) {
-                    doWrite();
+                    asyncWrite();
                 } else {
                     _writeInProgress = false;
                 }
