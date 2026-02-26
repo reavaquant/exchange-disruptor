@@ -3,6 +3,7 @@
 
 #include <boost/asio.hpp>
 #include <array>
+#include <cstddef>
 #include <stdint.h>
 #include <deque>
 #include <vector>
@@ -24,6 +25,8 @@ private:
     explicit Connection(boost::asio::io_context& ioContext, Codec& codec, MatchingEngine& matchingEngine);
 
     void doRead();
+    void handleCmd(const Command& cmd);
+    void enqueueRsp(std::vector<uint8_t> rsp);
     void doWrite();
 
     boost::asio::ip::tcp::socket _socket;
@@ -32,6 +35,7 @@ private:
     Codec& _codec;
     MatchingEngine& _matchingEngine;
     std::deque<std::vector<uint8_t>> _writeQueue; // outgoing payloads queue
+    bool _writeInProgress = false;
 };
 
 #endif // CONNECTION_H

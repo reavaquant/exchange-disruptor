@@ -1,5 +1,6 @@
 #include "server/connection.h"
 #include "matching_engine/matching_engine.h"
+#include <utility>
 
 
 Connection::Connection(boost::asio::io_context& ioContext, Codec& codec, MatchingEngine& matchingEngine) : _socket(ioContext), _codec(codec), _matchingEngine(matchingEngine) {}
@@ -14,7 +15,18 @@ void Connection::start() {
 }
 
 void Connection::stop() {
-    // Stop reading from the socket and handle error_code
+    _writeInProgress = false;
+    _writeQueue.clear();
+
+    if (!_socket.is_open()) {
+        return;
+    }
+
+    boost::system::error_code ec;
+    _socket.cancel(ec);
+    _socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+    _socket.close(ec);
+    _writeQueue.clear();
 }
 
 boost::asio::ip::tcp::socket& Connection::socket() {
@@ -27,7 +39,6 @@ void Connection::doRead() { // Read data from the socket
         [this, self](boost::system::error_code ec, std::size_t length) {
             if (!ec) {
                 std::vector<std::vector<uint8_t>> messages = _framer.consume(std::span<const uint8_t>(_buffer.data(), length));
-                (void)messages; // Process the data read from the socket
                 for (const auto& msg : messages) {
                     std::unique_ptr<Command> cmd;
                     try {
@@ -40,13 +51,7 @@ void Connection::doRead() { // Read data from the socket
                         stop();
                         return;
                     }
-                    // process dans IN_BUS de disruptor apres
-                    std::vector<std::unique_ptr<Event>> events = _matchingEngine.process(*cmd);
-                    for (const auto& event : events) {
-                        std::vector<uint8_t> encodedEvent = _codec.encodeEvent(*event);
-                        std::vector<uint8_t> framedEvent = _framer.frame(encodedEvent);
-                        // _writeQueue.push_back(framedEvent);
-                    }
+                    handleCmd(*cmd);
                 }
                 doRead();
             } else {
@@ -55,6 +60,52 @@ void Connection::doRead() { // Read data from the socket
         });
 }
 
+void Connection::handleCmd(const Command& cmd) {
+    // process dans IN_BUS de disruptor apres
+    std::vector<std::unique_ptr<Event>> events = _matchingEngine.process(cmd);
+    for (const auto& event : events) {
+        std::vector<uint8_t> encodedEvent = _codec.encodeEvent(*event);
+        std::vector<uint8_t> framedEvent = _framer.frame(encodedEvent);
+        enqueueRsp(std::move(framedEvent));
+    }
+}
+
+void Connection::enqueueRsp(std::vector<uint8_t> rsp) {
+    if (!_socket.is_open()) {
+        return;
+    }
+    if (_writeQueue.size() >= 1024) { // Arbitrary limit to prevent unbounded growth
+        stop();
+        return;
+    }
+
+    const bool startWrite = !_writeQueue.empty();
+    _writeQueue.push_back(std::move(rsp));
+    if (!_writeInProgress) {
+        _writeInProgress = true;
+        doWrite();
+    }
+}
+
 void Connection::doWrite() {
-    // Write data to the socket
+    if (_writeQueue.empty()) {
+        _writeInProgress = false;
+        return;
+    }
+
+    auto self(shared_from_this());
+    boost::asio::async_write(_socket, boost::asio::buffer(_writeQueue.front()),
+        [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+            if (!ec) {
+                _writeQueue.pop_front();
+                if (!_writeQueue.empty()) {
+                    doWrite();
+                } else {
+                    _writeInProgress = false;
+                }
+            } else {
+                _writeInProgress = false;
+                stop();
+            }
+        });
 }
