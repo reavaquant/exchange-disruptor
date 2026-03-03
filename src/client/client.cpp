@@ -70,3 +70,36 @@ void Client::handleEvent(const Event& event) {
     // afficher event
     std::cout << "Received event: " << static_cast<int>(event.getType()) << " for clientId: " << event.getClientId() << " orderId: " << event.getOrderId() << std::endl;
 }
+
+void Client::asyncWrite() {
+    if (_writeQueue.empty()) {
+        _writeInProgress = false;
+        return;
+    }
+
+    auto self(shared_from_this());
+    boost::asio::async_write(_socket, boost::asio::buffer(_writeQueue.front()),
+        [this, self](boost::system::error_code ec, std::size_t /*length*/) {
+            if (!ec) {
+                _writeQueue.pop_front();
+                if (!_writeQueue.empty()) {
+                    asyncWrite();
+                } else {
+                    _writeInProgress = false;
+                }
+            } else {
+                _writeInProgress = false;
+                stop();
+            }
+        });
+}
+
+void Client::post(const Command& cmd) {
+    std::vector<uint8_t> encodedCmd = _codec.encodeCommand(cmd);
+    std::vector<uint8_t> framedCmd = _framer.frame(encodedCmd);
+    _writeQueue.push_back(std::move(framedCmd));
+    if (!_writeInProgress) {
+        _writeInProgress = true;
+        asyncWrite();
+    }
+}

@@ -13,7 +13,7 @@ public:
 
     void stop();
     boost::asio::ip::tcp::socket& socket();
-    void post(const std::vector<uint8_t>& payload);
+    void post(const Command& cmd);
 
 private:
     void connect(const boost::asio::ip::tcp::resolver::results_type& endpoints);
