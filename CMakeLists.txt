@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
 
 project(
   exchange_disruptor
@@ -6,6 +9,9 @@ project(
   DESCRIPTION "Exchange Disruptor"
   LANGUAGES CXX
 )
+
+find_package(Boost CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -38,10 +44,20 @@ set(EXCHANGE_DISRUPTOR_SRC
   src/matching_engine/event/fill_event.cpp
   src/matching_engine/event/event.cpp
   src/matching_engine/event/ack_event.cpp
+  src/protocol/codec.cpp
+  src/protocol/framer.cpp
+  src/server/server.cpp
+  src/server/connection.cpp
+  src/client/client.cpp
 )
 
 add_library(exchange_disruptor_lib ${EXCHANGE_DISRUPTOR_SRC})
-target_link_libraries(exchange_disruptor_lib PUBLIC exchange_disruptor_options)
+target_link_libraries(exchange_disruptor_lib
+  PUBLIC
+    exchange_disruptor_options
+    Boost::boost
+    Threads::Threads
+)
 
 add_executable(exchange_disruptor src/main.cpp)
 target_link_libraries(exchange_disruptor PRIVATE exchange_disruptor_lib)
