@@ -77,9 +77,9 @@ void Connection::enqueueRsp(std::vector<uint8_t> rsp) {
         return;
     }
 
-    const bool startWrite = !_writeQueue.empty();
+    const bool writeInProgress = !_writeQueue.empty();
     _writeQueue.push_back(std::move(rsp));
-    if (!startWrite) {
+    if (!writeInProgress) {
         _writeInProgress = true;
         asyncWrite();
     }

@@ -1,29 +1,67 @@
 #include "client/client.h"
+#include <exception>
 #include <iostream>
 
-Client::Client(boost::asio::io_context& ioContext, const std::string& host, uint16_t port, Codec& codec) 
-    : 
-    _socket(ioContext), 
-    _ioContext(ioContext), 
-    _host(host), 
-    _port(port), 
-    _codec(codec) {
-    boost::asio::ip::tcp::resolver resolver(ioContext);
-    auto endpoints = resolver.resolve(host, std::to_string(port));
-    connect(endpoints);
+Client::Client(boost::asio::io_context& ioContext, const std::string& host, uint16_t port, Codec& codec)
+    : _socket(ioContext), _resolver(ioContext), _host(host), _port(port), _codec(codec) {}
+
+Client::pointer Client::create(boost::asio::io_context& ioContext, const std::string& host, uint16_t port, Codec& codec) {
+    pointer client(new Client(ioContext, host, port, codec));
+    client->start();
+    return client;
+}
+
+void Client::start() {
+    _stopped = false;
+
+    auto self = shared_from_this();
+    _resolver.async_resolve(_host, std::to_string(_port),
+        [this, self](const boost::system::error_code& ec,
+                     const boost::asio::ip::tcp::resolver::results_type& endpoints) {
+            if (ec) {
+                std::cerr << "Failed to resolve host: " << ec.message() << std::endl;
+                stop();
+                return;
+            }
+            connect(endpoints);
+        });
 }
 
 void Client::connect(const boost::asio::ip::tcp::resolver::results_type& endpoints) {
+    auto self(shared_from_this());
     boost::asio::async_connect(_socket, endpoints,
-        [this](boost::system::error_code ec, const boost::asio::ip::tcp::endpoint& /*endpoint*/) {
+        [this, self](boost::system::error_code ec, const boost::asio::ip::tcp::endpoint& /*endpoint*/) {
             if (!ec) {
+                _connected = true;
                 asyncRead();
+
+                if (!_writeQueue.empty() && !_writeInProgress) {
+                    _writeInProgress = true;
+                    asyncWrite();
+                }
+                return;
             }
+            std::cerr << "Failed to connect: " << ec.message() << std::endl;
+            stop();
         });
 }
 
 void Client::stop() {
+    auto self = shared_from_this();
+    boost::asio::dispatch(_socket.get_executor(), [this, self]() {
+        stopImpl();
+    });
+}
+
+
+void Client::stopImpl() {
+    _stopped = true;
+    _connected = false;
     _writeInProgress = false;
+    _writeQueue.clear();
+
+    _resolver.cancel();
+
     if (!_socket.is_open()) {
         return;
     }
@@ -32,11 +70,6 @@ void Client::stop() {
     _socket.cancel(ec);
     _socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
     _socket.close(ec);
-    _writeQueue.clear();
-}
-
-boost::asio::ip::tcp::socket& Client::socket() {
-    return _socket;
 }
 
 void Client::asyncRead() {
@@ -67,8 +100,24 @@ void Client::asyncRead() {
 }
 
 void Client::handleEvent(const Event& event) {
-    // afficher event
-    std::cout << "Received event: " << static_cast<int>(event.getType()) << " for clientId: " << event.getClientId() << " orderId: " << event.getOrderId() << std::endl;
+    std::cout << "Received event: " << static_cast<int>(event.getType())
+              << " for clientId: " << event.getClientId()
+              << " orderId: " << event.getOrderId() << std::endl;
+}
+
+void Client::enqueueWrite(std::vector<uint8_t> payload) {
+    if (_stopped) return;
+    if (_writeQueue.size() >= 1024) {
+        stop();
+        return;
+    }
+
+    _writeQueue.push_back(std::move(payload));
+
+    if (_connected && !_writeInProgress) {
+        _writeInProgress = true;
+        asyncWrite();
+    }
 }
 
 void Client::asyncWrite() {
@@ -94,12 +143,27 @@ void Client::asyncWrite() {
         });
 }
 
-void Client::post(const Command& cmd) {
-    std::vector<uint8_t> encodedCmd = _codec.encodeCommand(cmd);
-    std::vector<uint8_t> framedCmd = _framer.frame(encodedCmd);
-    _writeQueue.push_back(std::move(framedCmd));
-    if (!_writeInProgress) {
-        _writeInProgress = true;
-        asyncWrite();
+void Client::post(std::unique_ptr<Command> cmd) {
+    if (!cmd) {
+        return;
     }
+
+    auto self = shared_from_this();
+    boost::asio::post(_socket.get_executor(),
+        [this, self, cmd = std::move(cmd)]() mutable {
+            if (_stopped) {
+                return;
+            }
+            try {
+                auto bytes = _codec.encodeCommand(*cmd);
+                auto framed = _framer.frame(bytes);
+                enqueueWrite(std::move(framed));
+            } catch (const std::exception& ex) {
+                std::cerr << "Failed to encode command: " << ex.what() << std::endl;
+                stopImpl();
+            } catch (...) {
+                std::cerr << "Failed to encode command: unknown error" << std::endl;
+                stopImpl();
+            }
+        });
 }
