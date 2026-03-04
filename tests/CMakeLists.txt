@@ -13,3 +13,14 @@ target_link_libraries(exchange_disruptor_tcp_v1_tests PRIVATE exchange_disruptor
 target_set_warnings(exchange_disruptor_tcp_v1_tests)
 
 add_test(NAME exchange_disruptor.tcp_v1.tests COMMAND $<TARGET_FILE:exchange_disruptor_tcp_v1_tests>)
+
+add_executable(exchange_disruptor_tcp_v1_integration_tests
+  integration/tcp_v1.tests.cpp
+)
+target_link_libraries(exchange_disruptor_tcp_v1_integration_tests PRIVATE exchange_disruptor_lib exchange_disruptor_options)
+target_set_warnings(exchange_disruptor_tcp_v1_integration_tests)
+
+add_test(
+  NAME exchange_disruptor.tcp_v1.integration.tests
+  COMMAND $<TARGET_FILE:exchange_disruptor_tcp_v1_integration_tests>
+)
