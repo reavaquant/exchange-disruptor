@@ -1,61 +1,82 @@
 # Exchange Disruptor
 
-> A compact C++20 exchange simulator built around a price-time-priority limit order book and an asynchronous binary TCP protocol.
+Exchange Disruptor is a C++20 matching engine backed by an in-memory limit order book. It accepts limit, market, and cancel commands over TCP, applies price-time priority, and returns acknowledgements, rejections, and execution reports through a compact binary protocol.
 
-Exchange Disruptor is an educational trading-systems project. Its current milestone implements the matching core and TCP v1 transport: clients submit limit, market, and cancel commands; the engine updates a single-symbol order book and returns acknowledgements, rejections, and fills.
+The server owns one configured instrument, and every connected client trades against the same book. Network callbacks and matching are serialized on one Boost.Asio event loop, establishing a single processing order across all connections.
 
-## What is implemented
+## Trading model
 
-- Price-time priority: best price first, FIFO within a price level
-- Limit orders with full fills, partial fills, and resting remainders
-- Market orders that sweep multiple price levels
-- Indexed cancellation by `orderId`, including ownership checks
-- `Ack`, `Reject`, and paired maker/taker `Fill` events
-- Length-prefixed binary protocol in network byte order
-- Stateful frame reassembly across partial TCP reads
-- Asynchronous, multi-connection TCP server and client API with Boost.Asio
-- Unit, TCP component, and process-level integration tests
+An incoming order always meets the best available price first. If several resting orders share that price, they execute in arrival order.
 
-The project currently runs the network and matching logic on one Boost.Asio event loop. The SPSC ring buffers and multi-threaded Disruptor-style pipeline are the next milestone.
+For a buy order, the engine starts at the lowest ask. For a sell order, it starts at the highest bid. Trades execute at the resting order's price, and each match produces two `Fill` events—one for the maker and one for the taker—with the same `matchId`, price, and quantity.
 
-## Architecture
+| Command | Engine behaviour | Result |
+| --- | --- | --- |
+| `Limit` | Matches while the opposite price crosses the limit; any remaining quantity rests on the book | Fill pairs followed by `Ack`, or `Reject` |
+| `Market` | Sweeps available liquidity from the best price outward; unfilled quantity does not rest | `Ack` followed by zero or more fill pairs |
+| `Cancel` | Locates a resting order by `orderId` and verifies its owner | `Ack`, `UnknownOrderId`, or `NotOwner` |
+
+Price levels are held in ordered maps and orders within a level are held in FIFO lists. A separate `orderId` index points to each resting order, so cancellation does not require a scan of the book.
+
+Prices and quantities use signed 64-bit integers. This keeps floating-point arithmetic out of the matching path and lets the calling application define its own fixed-point price scale.
+
+## Request path
 
 ```mermaid
 flowchart LR
-    C[Client API] <-->|TCP| S[Async server]
-    S --> F[Framer]
-    F --> D[Binary codec]
-    D --> M[Matching engine]
-    M --> B[(Bid / Ask books)]
-    M --> E[Ack / Reject / Fill events]
-    E --> D
-    D --> F
-    F --> S
+    Client[Client]
+
+    subgraph Server[Exchange server · one Boost.Asio event loop]
+        TCP[TCP connection]
+        Framer[Length-prefix framer]
+        Codec[Binary codec]
+        Engine[Matching engine]
+        Book[(Bid / ask book)]
+
+        TCP --> Framer --> Codec --> Engine
+        Engine <--> Book
+        Engine --> Codec --> Framer --> TCP
+    end
+
+    Client <-->|TCP| TCP
 ```
 
-The book stores orders in price levels backed by FIFO lists. An `orderId` index points directly to resting orders, so cancellation does not scan the full book.
+TCP is treated as a byte stream rather than a message transport. `Framer` retains incomplete input between reads and can extract several complete messages from a single read. `Codec` then turns each payload into a command before handing it to the matching engine. The resulting events follow the same path in reverse and are written to the connection that submitted the command.
 
-## Requirements
+## A trade from end to end
+
+Consider an empty book configured for `ACME`:
+
+1. Client 1 submits a limit order to sell 5 units at 100 (`orderId=1001`). Nothing crosses, so the order rests at the best ask and the server returns an `Ack`.
+2. Client 2 submits a limit order to buy 5 units at 100 (`orderId=2002`). The incoming bid crosses the resting ask.
+3. The engine executes 5 units at the maker's price of 100. It emits one fill for order `1001`, one fill for order `2002`, and an acknowledgement for the incoming order.
+4. Both fills carry the same `matchId`; neither order remains on the book.
+
+The process-level integration suite runs this exact scenario against a real server with two TCP clients.
+
+## Build
+
+### Requirements
 
 - CMake 3.20 or newer
-- A C++20 compiler
+- C++20 compiler
 - Boost headers, including Boost.Asio
-- POSIX environment for the process-level integration test (`fork`, `waitpid`, and signals)
-- Unix Makefiles, as configured by the included presets
+- Unix Makefiles, as selected by the repository presets
+- POSIX environment for process-level tests (`fork`, `waitpid`, and signals)
 
-On macOS with Homebrew:
+Install the build dependencies on macOS:
 
 ```bash
 brew install cmake boost
 ```
 
-On Debian or Ubuntu:
+Or on Debian and Ubuntu:
 
 ```bash
 sudo apt-get install build-essential cmake libboost-all-dev
 ```
 
-## Build and test
+Configure, compile, and run the complete test suite:
 
 ```bash
 git clone https://github.com/reavaquant/exchange-disruptor.git
@@ -66,9 +87,7 @@ cmake --build --preset debug -j
 ctest --preset debug --output-on-failure
 ```
 
-For an optimized build, replace `debug` with `release` in the three CMake commands.
-
-Compiler warnings can optionally be promoted to errors:
+The same workflow is available through the `release` preset. Compiler warnings can be promoted to errors at configuration time:
 
 ```bash
 cmake --preset debug -DEXCHANGE_DISRUPTOR_WARNINGS_AS_ERRORS=ON
@@ -77,29 +96,29 @@ cmake --build --preset debug -j
 
 ## Run the server
 
-Start an IPv4 server for symbol `ACME` on port `9000`:
+The default server listens on IPv4 port `9000` and creates a book for `ACME`:
 
 ```bash
 ./build/debug/exchange_disruptor server
 ```
 
-All server options are optional:
+The instrument, port, and IP version can be selected at startup:
 
 ```text
 exchange_disruptor server [--port PORT] [--symbol SYMBOL] [--ipv4 | --ipv6]
 ```
 
-Example with custom settings:
+For example:
 
 ```bash
 ./build/debug/exchange_disruptor server --port 9100 --symbol BTCUSD --ipv6
 ```
 
-Stop the server with `Ctrl+C`.
+The process runs until it receives an external termination signal such as `Ctrl+C`.
 
-## Use the client API
+## Connect a client
 
-The current client is a library API rather than an interactive CLI. Commands can be posted before or after the asynchronous connection completes:
+The repository exposes the TCP client as a C++ API. It resolves and connects asynchronously, queues commands while the connection is being established, frames outgoing payloads, and decodes incoming events.
 
 ```cpp
 #include <boost/asio.hpp>
@@ -118,7 +137,7 @@ int main() {
         1001,       // orderId
         "ACME",     // symbol
         Side::Buy,
-        10'000,     // integer price
+        10'000,     // price
         5           // quantity
     ));
 
@@ -126,118 +145,105 @@ int main() {
 }
 ```
 
-Prices and quantities are represented as signed 64-bit integers, avoiding floating-point arithmetic in the matching path. Applications can choose their own fixed-point price scale.
+The client is provided as a library rather than an interactive executable and is linked through the `exchange_disruptor_lib` CMake target.
 
-## Matching behaviour
+## Wire protocol
 
-| Command | Behaviour | Events |
-| --- | --- | --- |
-| `Limit` | Crosses compatible resting orders, then places any remainder on the book | Zero or more fill pairs, followed by `Ack`; invalid commands are rejected |
-| `Market` | Consumes available liquidity from the best price outward; unmatched quantity expires | `Ack`, followed by zero or more fill pairs |
-| `Cancel` | Removes a resting order through the internal index | `Ack`, or `Reject` if the order is unknown or owned by another client |
-
-Each match produces one `Fill` for the resting order and one for the incoming order, both carrying the same `matchId`, execution price, and quantity. The execution price is the resting order's price.
-
-### Reproducible crossing scenario
-
-The process-level integration test launches a real server, connects two peers, and verifies this sequence:
-
-1. Client 1 submits `SELL 5 @ 100` (`orderId=1001`) and receives an `Ack`.
-2. Client 2 submits `BUY 5 @ 100` (`orderId=2002`).
-3. The server emits two `Fill` events at price `100`, quantity `5`, with the same `matchId`, followed by an `Ack` for the incoming limit order.
-
-Run only that integration suite with:
-
-```bash
-ctest --preset debug -R exchange_disruptor.tcp_v1.integration.tests -V
-```
-
-## TCP protocol v1
-
-Every message uses the same frame envelope:
+Protocol v1 uses a four-byte big-endian payload length followed by the payload itself:
 
 ```text
-+------------------------+----------------------+
-| payload length (u32 BE)| payload (0..1024 B) |
-+------------------------+----------------------+
++-------------------------+----------------------+
+| payload length (u32 BE) | payload (0..1024 B) |
++-------------------------+----------------------+
 ```
 
-Multi-byte fields use big-endian (network) byte order. Symbols are byte sequences prefixed by an unsigned 8-bit length.
+Every multi-byte integer is encoded in network byte order. A symbol is encoded as an unsigned 8-bit byte length followed by the symbol bytes.
 
-### Commands: client to server
+### Commands · client to server
 
-All command payloads begin with:
+All commands start with the same header:
 
 ```text
 type:u8 | clientId:u64 | orderId:u64 | symbolLength:u8 | symbol:bytes
 ```
 
-| Type | Value | Additional fields |
+| Type | Value | Remaining payload |
 | --- | ---: | --- |
 | Limit | `1` | `price:i64 \| quantity:i64 \| side:u8` |
 | Market | `2` | `quantity:i64 \| side:u8` |
 | Cancel | `3` | none |
 
-Sides are `Buy = 1` and `Sell = 2`.
+Sides are encoded as `Buy = 1` and `Sell = 2`.
 
-### Events: server to client
+### Events · server to client
 
-All event payloads begin with:
+All events start with:
 
 ```text
 type:u8 | clientId:u64 | orderId:u64
 ```
 
-| Type | Value | Additional fields |
+| Type | Value | Remaining payload |
 | --- | ---: | --- |
 | Ack | `1` | none |
 | Reject | `2` | `reason:u8` |
 | Fill | `3` | `matchId:u64 \| price:i64 \| quantity:i64` |
 
-Reject reasons are `InvalidQuantity = 1`, `InvalidPrice = 2`, `UnknownSymbol = 3`, `UnknownOrderId = 4`, `NotOwner = 5`, and `InternalError = 6`.
+Reject reasons are:
 
-Invalid command payloads close the offending connection without stopping the server. Frame payloads are capped at 1024 bytes; oversized frames are discarded by the framer.
+| Value | Reason |
+| ---: | --- |
+| `1` | `InvalidQuantity` |
+| `2` | `InvalidPrice` |
+| `3` | `UnknownSymbol` |
+| `4` | `UnknownOrderId` |
+| `5` | `NotOwner` |
+| `6` | `InternalError` |
 
-## Tests
+Invalid command payloads close only the offending connection. Oversized frames are discarded when their declared payload exceeds 1024 bytes.
 
-CTest registers three suites:
+## Verification
 
-- `exchange_disruptor.tests` — matching and order-book behaviour
-- `exchange_disruptor.tcp_v1.tests` — codec, framing, and in-process TCP behaviour
-- `exchange_disruptor.tcp_v1.integration.tests` — real server process with multiple clients
+Three CTest targets cover the system at different boundaries:
 
-List or run them individually:
+| Test | Coverage |
+| --- | --- |
+| `exchange_disruptor.tests` | Price-time priority, partial and complete fills, market sweeps, cancellation, and rejection paths |
+| `exchange_disruptor.tcp_v1.tests` | Codec round trips, fragmented frames, connection handling, and in-process TCP matching |
+| `exchange_disruptor.tcp_v1.integration.tests` | Spawned server process, two-client crossing, event ordering, and isolation of malformed clients |
+
+Run a single boundary with CTest's regular expression filter:
 
 ```bash
-ctest --preset debug -N
-ctest --preset debug -R exchange_disruptor.tests -V
-ctest --preset debug -R exchange_disruptor.tcp_v1.tests -V
+ctest --preset debug -R exchange_disruptor.tcp_v1.integration.tests -V
 ```
+
+## Scope
+
+The server's operating boundary is explicit:
+
+| Area | Current behaviour |
+| --- | --- |
+| Instruments | One configured symbol per server process |
+| State | In-memory order book; no journal or recovery |
+| Scheduling | Network I/O and matching serialized on one Boost.Asio event loop |
+| Client delivery | Events are returned on the connection that submitted the command |
+| Risk and accounts | Outside the matching engine |
+| Market data | No separate public feed |
 
 ## Repository layout
 
 ```text
 .
 ├── include/exchange-disruptor/
-│   ├── client/              # asynchronous client API
-│   ├── matching_engine/     # commands, events, book, and matching
-│   ├── protocol/            # binary codec and TCP framing
-│   └── server/              # listener and per-client connections
-├── src/                     # implementations and server entry point
+│   ├── client/              # asynchronous TCP client
+│   ├── matching_engine/     # commands, events, books, and matching rules
+│   ├── protocol/            # binary codec and stream framing
+│   └── server/              # listener and per-connection state
+├── src/                     # implementations and process entry point
 ├── tests/
 │   ├── unit/                # engine and TCP component tests
-│   └── integration/         # spawned-server end-to-end tests
-├── docs/subject/            # original project brief
+│   └── integration/         # real-process TCP tests
 ├── CMakeLists.txt
 └── CMakePresets.json
 ```
-
-The original assignment is available as [docs/subject/main.pdf](docs/subject/main.pdf).
-
-## Roadmap
-
-- Add fixed-capacity SPSC ring buffers for command and event buses
-- Move matching onto a dedicated thread
-- Route events back to their owning client session
-- Add an interactive command-line client
-- Add latency and throughput benchmarks
